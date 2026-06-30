@@ -49,9 +49,18 @@ const saveLocalData = (data) => { fs.writeFileSync(dbPath, JSON.stringify(data, 
 
 // --- 数据库连接 ---
 if (process.env.MONGODB_URI) {
-  mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 2000 })
-    .then(() => { useCloudDB = true; console.log('✅ DATABASE: CLOUD'); })
-    .catch(() => { useCloudDB = false; console.log('⚠️ DATABASE: LOCAL (Fallback)'); });
+  mongoose.connect(process.env.MONGODB_URI, { 
+    serverSelectionTimeoutMS: 10000 // 延长到 10 秒
+  })
+    .then(() => { 
+      useCloudDB = true; 
+      console.log('✅ DATABASE: CLOUD'); 
+    })
+    .catch((err) => { 
+      useCloudDB = false; 
+      console.log('⚠️ DATABASE: LOCAL (Fallback)'); 
+      console.log('❌ 数据库连接报错详情:', err.message);
+    });
 }
 
 // --- 云端模型定义 ---
