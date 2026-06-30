@@ -50,11 +50,32 @@ const saveLocalData = (data) => { fs.writeFileSync(dbPath, JSON.stringify(data, 
 // --- 数据库连接 ---
 if (process.env.MONGODB_URI) {
   mongoose.connect(process.env.MONGODB_URI, { 
-    serverSelectionTimeoutMS: 10000 // 延长到 10 秒
+    serverSelectionTimeoutMS: 10000 
   })
-    .then(() => { 
+    .then(async () => { 
       useCloudDB = true; 
       console.log('✅ DATABASE: CLOUD'); 
+      
+      // --- 自动补全管理员逻辑 (解决本地无法迁移问题) ---
+      try {
+        const adminExists = await User.findOne({ username: 'admin' });
+        if (!adminExists) {
+          await User.create({
+            username: 'admin',
+            password: '$2b$10$QgScf6ywPMBNBkapMXtxeOrwUpB2ikT5RGdwDKoBiY4Zg/S6JDmQu', // 保持您本地的加密密码
+            role: 'admin'
+          });
+          console.log('🚀 已自动在云端激活 admin 账号');
+        }
+        
+        // 自动初始化默认品类
+        const catCount = await Category.countDocuments();
+        if (catCount === 0) {
+          await Category.insertMany([{name:'嘴贴'}, {name:'鼻贴'}, {name:'样品'}]);
+          console.log('📦 已自动初始化默认品类');
+        }
+      } catch (e) { console.log('⚠️ 自动初始化跳过:', e.message); }
+      
     })
     .catch((err) => { 
       useCloudDB = false; 
