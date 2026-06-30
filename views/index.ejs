@@ -74,6 +74,12 @@
 
 <body class="flex h-screen overflow-hidden text-slate-800 select-none">
     <div id="toast" class="hidden fixed bottom-10 left-1/2 -translate-x-1/2 z-[300] px-6 py-4 rounded-3xl shadow-2xl transition-all duration-500 font-black text-sm flex items-center text-white min-w-[280px] justify-center text-center"></div>
+    <!-- 全局加载遮罩 -->
+    <div id="globalLoading" class="hidden fixed inset-0 z-[600] bg-slate-900/40 backdrop-blur-md flex flex-col items-center justify-center">
+        <div class="w-20 h-20 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p class="text-white font-black text-lg tracking-widest animate-pulse">正在同步云端数据库...</p>
+        <p class="text-white/60 text-xs mt-2">首次上传图片可能较慢，请勿关闭页面</p>
+    </div>
     <div id="imgPreviewOverlay" onclick="this.classList.add('hidden')" class="hidden fixed inset-0 z-[400] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4">
         <img id="imgPreviewContent" src="" class="max-w-full max-h-full rounded-3xl shadow-2xl border border-white/10 animate-in zoom-in-95 duration-300">
     </div>
@@ -749,11 +755,12 @@
         async function doSaveProduct() {
             const btn = getEl('btnSaveProd'); if(btn.disabled) return;
             const eid = getEl('editProdId').value;
+            getEl('globalLoading').classList.remove('hidden');
             try {
                 btn.disabled = true; 
+                btn.innerText = '正在上传数据...';
                 const cust = await getOrCreateCustomer(getEl('pCust').value, getEl('pCustAddr').value, getEl('pCustPhone').value);
                 const fd = new FormData();
-                // 修正字段映射
                 const mapping = { name:'pName', sku:'pSku', category:'pCat', unitPrice:'pPrice', currency:'pCurr', packaging:'pPack', notes:'pNotes', factoryId:'pFact', spec:'pSpec', material:'pMat' };
                 for(let k in mapping) { fd.append(k, getEl(mapping[k]).value); }
                 fd.append('customerName', cust?.name || '通用'); 
@@ -764,7 +771,14 @@
                 
                 if(eid) await api.put(`/products/${eid}`, fd); else await api.post('/products', fd);
                 closeModal('prodModal'); renderInventory(); toast('✅ 产品档案已成功保存', 'bg-emerald-600');
-            } catch(e) { toast('❌ 保存失败：请检查数据完整性', 'bg-red-600'); } finally { btn.disabled = false; }
+            } catch(e) { 
+                console.error('Save Product Error:', e);
+                toast('❌ 档案保存失败：可能是图片太大或网络超时', 'bg-red-600'); 
+            } finally { 
+                btn.disabled = false; 
+                btn.innerText = '确认并保存档案';
+                getEl('globalLoading').classList.add('hidden');
+            }
         }
 
         
@@ -792,9 +806,13 @@
         async function doSaveTrans() {
             const btn = getEl('btnSaveTrans'); if(btn.disabled) return;
             const isN = getEl('isNew').checked;
+            getEl('globalLoading').classList.remove('hidden');
             try {
-                btn.disabled = true; let pid = getEl('tProd').value;
+                btn.disabled = true; 
+                btn.innerText = '正在同步数据...';
+                let pid = getEl('tProd').value;
                 if(isN) {
+                    btn.innerText = '正在建立新产品档案...';
                     const cust = await getOrCreateCustomer(getEl('qCust').value, getEl('qCustAddr').value, getEl('qCustPhone').value);
                     const fd = new FormData();
                     const qMap = { name:'qName', category:'qCat', unitPrice:'qPrice', currency:'qCurr', factoryId:'qFact', packaging:'qPack', sku:'qSku', spec:'qSpec', material:'qMat' };
@@ -804,9 +822,15 @@
                         const compressed = await compressImage(getEl('qImage').files[0]);
                         fd.append('image', compressed, 'compressed.jpg');
                     }
-                    const r = await api.post('/products', fd); pid = r.data.id;
+                    const r = await api.post('/products', fd); 
+                    pid = r.data.id;
                 }
-                if(!pid && !isN) return toast('⚠️ 请选择或录入产品', 'bg-amber-500');
+                if(!pid && !isN) {
+                    getEl('globalLoading').classList.add('hidden');
+                    return toast('⚠️ 请选择或录入产品', 'bg-amber-500');
+                }
+                
+                btn.innerText = '正在保存流水记录...';
                 const tfd = new FormData(); 
                 tfd.append('productId', pid); 
                 tfd.append('type', getEl('tType').value); 
@@ -819,11 +843,22 @@
                     tfd.append('transImage', compressed, 'compressed.jpg');
                 }
                 await api.post('/transactions', tfd); 
-                // 强制同步本地 products 数组，确保渲染时能找到新产品
+                
                 const finalInv = await api.get('/inventory');
                 products = finalInv.data;
-                resetTransModal(); closeModal('transModal'); renderTrans(); renderInventory(); toast('✅ 业务已成功入库并已清空表单', 'bg-emerald-600');
-            } catch (e) { toast('❌ 提交失败：请确保所有必填项已填写', 'bg-red-600'); } finally { btn.disabled = false; }
+                resetTransModal(); 
+                closeModal('transModal'); 
+                renderTrans(); 
+                renderInventory(); 
+                toast('✅ 业务已成功入库', 'bg-emerald-600');
+            } catch (e) { 
+                console.error('Save Transaction Error:', e);
+                toast('❌ 提交失败：请检查网络或必填项', 'bg-red-600'); 
+            } finally { 
+                btn.disabled = false; 
+                btn.innerText = '立即提交业务记录';
+                getEl('globalLoading').classList.add('hidden');
+            }
         }
 
         function showInvDetail(id) {
