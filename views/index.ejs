@@ -644,9 +644,27 @@
 
         async function renderTrans() {
             try {
-                const res = await api.get('/transactions'); let sorted = res.data.slice().reverse();
-                if(getEl('transSortField').value==='quantity') sorted.sort((a,b)=>b.quantity-a.quantity);
-                getEl('transList').innerHTML = sorted.map(t => {
+                const res = await api.get('/transactions'); 
+                let data = res.data;
+                const sortType = getEl('transSortField').value;
+                
+                if (sortType === 'dateDesc') {
+                    data.sort((a, b) => new Date(b.date) - new Date(a.date));
+                } else if (sortType === 'dateAsc') {
+                    data.sort((a, b) => new Date(a.date) - new Date(b.date));
+                } else if (sortType === 'qtyDesc') {
+                    data.sort((a, b) => b.quantity - a.quantity);
+                } else if (sortType === 'valDesc') {
+                    data.sort((a, b) => {
+                        const pA = products.find(x => x.id === a.productId);
+                        const pB = products.find(x => x.id === b.productId);
+                        const valA = a.quantity * (pA?.unitPrice || 0);
+                        const valB = b.quantity * (pB?.unitPrice || 0);
+                        return valB - valA;
+                    });
+                }
+
+                getEl('transList').innerHTML = data.map(t => {
                     const p = products.find(x => x.id === t.productId), isIn = t.type === 'in';
                     const isAdmin = currentUser.role === 'admin' || currentUser.role === 'manager';
                     const imgPreview = t.image ? `<img src="${t.image}" class="w-16 h-16 md:w-28 md:h-28 rounded-2xl object-cover shadow-lg border-2 md:border-4 border-white cursor-zoom-in hover:scale-105 transition-transform flex-shrink-0" onclick="event.stopPropagation(); previewImg('${t.image}')">` : `<div class="w-16 h-16 md:w-28 md:h-28 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-300 border-2 border-dashed border-slate-200 flex-shrink-0"><i data-lucide="image" class="w-8 h-8"></i></div>`;
