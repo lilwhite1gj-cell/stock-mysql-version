@@ -202,7 +202,15 @@
                             <span onclick="fetchExchangeRate()" class="rate-display cursor-pointer hover:text-indigo-600 transition-colors text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md tracking-widest text-center" title="点击手动刷新汇率">正在同步汇率...</span>
                         </div>
                     </div>
-                    <div class="flex items-center space-x-3 bg-white px-6 py-4 rounded-[22px] shadow-sm border border-slate-100 self-start"><span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Order:</span><select id="transSortField" onchange="renderTrans()" class="bg-transparent outline-none font-black text-sm text-indigo-600"><option value="date">日期倒序</option><option value="quantity">数量大小</option></select></div>
+                    <div class="flex items-center space-x-3 bg-white px-6 py-4 rounded-[22px] shadow-sm border border-slate-100 self-start">
+                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Order:</span>
+                        <select id="transSortField" onchange="renderTrans()" class="bg-transparent outline-none font-black text-sm text-indigo-600">
+                            <option value="dateDesc">日期: 最近优先</option>
+                            <option value="dateAsc">日期: 最早优先</option>
+                            <option value="qtyDesc">数量: 从大到小</option>
+                            <option value="valDesc">金额: 高价优先</option>
+                        </select>
+                    </div>
                     <div id="transList" class="space-y-6"></div>
                 </div>
 
