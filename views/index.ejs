@@ -777,32 +777,38 @@
         }
 
         function updateDynamicHints(prefix) {
-            const cat = getEl(prefix + 'Cat').value || '';
+            const catEl = getEl(prefix + 'Cat');
+            const cat = catEl ? catEl.value : '';
             const isSample = cat.includes('样品');
             
-            // 定义在“样品”模式下变为选填的字段后缀
             const optionalSuffixes = ['Sku', 'Cust', 'Fact', 'Price', 'Curr', 'Pack', 'Notes', 'CustAddr', 'CustPhone'];
             
             optionalSuffixes.forEach(s => {
                 const el = getEl(prefix + s);
                 if(!el) return;
                 
-                // 获取不含“(选填)”的基础提示文字
-                const baseHint = (el.getAttribute('placeholder') || (el.options && el.options[0] ? el.options[0].text : '')).replace(' (选填)', '');
+                let baseHint = '';
+                if (el.tagName === 'SELECT') {
+                    if (el.options && el.options.length > 0) {
+                        baseHint = el.options[0].text.replace(' (选填)', '');
+                    }
+                } else {
+                    baseHint = (el.getAttribute('placeholder') || '').replace(' (选填)', '');
+                }
                 
+                if(!baseHint) return;
+
                 if(isSample) {
-                    // 设置为选填样式
                     if(el.tagName === 'SELECT') {
-                        if(el.options[0]) el.options[0].text = baseHint + ' (选填)';
+                        if(el.options && el.options.length > 0) el.options[0].text = baseHint + ' (选填)';
                     } else {
                         el.setAttribute('placeholder', baseHint + ' (选填)');
                     }
                     el.classList.add('bg-slate-50', 'text-slate-400');
                     el.classList.remove('bg-white', 'bg-slate-100');
                 } else {
-                    // 恢复为必填样式
                     if(el.tagName === 'SELECT') {
-                        if(el.options[0]) el.options[0].text = baseHint;
+                        if(el.options && el.options.length > 0) el.options[0].text = baseHint;
                     } else {
                         el.setAttribute('placeholder', baseHint);
                     }
@@ -876,47 +882,52 @@
 
         
         function resetTransModal() {
-            // 重置复选框
-            const isNew = getEl('isNew');
-            if(isNew) { isNew.checked = false; toggleQuickFields(); }
-            
-            // 清空下拉选择和基本输入
-            ['tProd', 'tQty', 'tOrder', 'tLog', 'tNotes', 'qName', 'qSku', 'qPrice', 'qPack', 'qSpec', 'qMat', 'qCust', 'qCustAddr', 'qCustPhone', 'tCustomer'].forEach(id => {
-                const el = getEl(id); if(el) el.value = '';
-            });
-            
-            // 重置文件上传
-            ['qImage', 'tImage'].forEach(id => {
-                const el = getEl(id); if(el) el.value = '';
-            });
-            
-            // 重置 Select 默认值
-            ['tType', 'qCurr', 'qCat', 'qFact'].forEach(id => {
-                const el = getEl(id); if(el && el.options[0]) el.selectedIndex = 0;
-            });
+            try {
+                // 重置复选框
+                const isNew = getEl('isNew');
+                if(isNew) { isNew.checked = false; toggleQuickFields(); }
+                
+                // 清空基本输入
+                ['tProd', 'tQty', 'tOrder', 'tLog', 'tNotes', 'qName', 'qSku', 'qPrice', 'qPack', 'qSpec', 'qMat', 'qCust', 'qCustAddr', 'qCustPhone', 'tCustomer'].forEach(id => {
+                    const el = getEl(id); if(el) el.value = '';
+                });
+                
+                // 重置文件上传
+                ['qImage', 'tImage'].forEach(id => {
+                    const el = getEl(id); if(el) el.value = '';
+                });
+                
+                // 重置 Select 默认值
+                ['tType', 'qCurr', 'qCat', 'qFact'].forEach(id => {
+                    const el = getEl(id); if(el && el.options[0]) el.selectedIndex = 0;
+                });
+            } catch (e) { console.error('Reset Modal Error:', e); }
         }
 
         function openTransModal(type) {
-            resetTransModal();
-            getEl('tType').value = type;
-            const isIn = type === 'in';
-            
-            // UI 动态调整
-            getEl('transModalTitle').innerText = isIn ? '产品入库记账' : '产品发货出库';
-            getEl('inOnlyBox').classList.toggle('hidden', !isIn);
-            getEl('outOnlyBox').classList.toggle('hidden', isIn);
-            
-            // 按钮颜色与文字
-            const btn = getEl('btnSaveTrans');
-            btn.className = `w-full ${isIn?'bg-emerald-600 shadow-emerald-200':'bg-rose-600 shadow-rose-200'} text-white py-6 rounded-[28px] font-black text-xl shadow-2xl active:scale-95 transition-all`;
-            
-            // 状态标签
-            getEl('typeText').innerText = isIn ? '产品入库 (+)' : '发货出库 (-)';
-            const iconHtml = isIn ? '<i data-lucide="download" class="w-5 h-5"></i>' : '<i data-lucide="upload" class="w-5 h-5"></i>';
-            getEl('typeIcon').innerHTML = iconHtml;
-            
-            lucide.createIcons();
-            openModal('transModal');
+            console.log('Opening Trans Modal:', type);
+            try {
+                resetTransModal();
+                const tTypeEl = getEl('tType');
+                if(!tTypeEl) return;
+                tTypeEl.value = type;
+                const isIn = type === 'in';
+                
+                getEl('transModalTitle').innerText = isIn ? '产品入库记账' : '产品发货出库';
+                getEl('inOnlyBox')?.classList.toggle('hidden', !isIn);
+                getEl('outOnlyBox')?.classList.toggle('hidden', isIn);
+                
+                const btn = getEl('btnSaveTrans');
+                if(btn) {
+                    btn.className = `w-full ${isIn?'bg-emerald-600 shadow-emerald-200':'bg-rose-600 shadow-rose-200'} text-white py-6 rounded-[28px] font-black text-xl shadow-2xl active:scale-95 transition-all`;
+                }
+                
+                getEl('typeText').innerText = isIn ? '产品入库 (+)' : '发货出库 (-)';
+                getEl('typeIcon').innerHTML = isIn ? '<i data-lucide="download" class="w-5 h-5"></i>' : '<i data-lucide="upload" class="w-5 h-5"></i>';
+                
+                if(typeof lucide !== 'undefined') lucide.createIcons();
+                openModal('transModal');
+            } catch (err) { console.error(err); }
         }
 
         async function doSaveTrans() {
@@ -947,7 +958,6 @@
                     return toast('⚠️ 请选择产品', 'bg-amber-500');
                 }
                 
-                // 如果是出库且填写了客户，自动建立/关联客户关系
                 if(type === 'out' && getEl('tCustomer').value) {
                     await getOrCreateCustomer(getEl('tCustomer').value);
                 }
@@ -969,170 +979,13 @@
                 
                 const finalInv = await api.get('/inventory');
                 products = finalInv.data;
-                resetTransModal(); 
-                closeModal('transModal'); 
-                renderTrans(); 
-                renderInventory(); 
+                resetTransModal(); closeModal('transModal'); renderTrans(); renderInventory(); 
                 toast('✅ 业务已成功同步', 'bg-emerald-600');
             } catch (e) { 
-                console.error('Save Transaction Error:', e);
+                console.error(e);
                 toast('❌ 提交失败：请检查网络或必填项', 'bg-red-600'); 
             } finally { 
-                btn.disabled = false; 
-                btn.innerText = '立即提交业务记录';
-                getEl('globalLoading').classList.add('hidden');
-            }
-        }
-
-        function openTransModal(type) {
-            resetTransModal();
-            getEl('tType').value = type;
-            const isIn = type === 'in';
-            
-            // UI 动态调整
-            getEl('transModalTitle').innerText = isIn ? '产品入库记账' : '产品发货出库';
-            getEl('inOnlyBox').classList.toggle('hidden', !isIn);
-            getEl('outOnlyBox').classList.toggle('hidden', isIn);
-            
-            // 按钮颜色与文字
-            const btn = getEl('btnSaveTrans');
-            btn.className = `w-full ${isIn?'bg-emerald-600 shadow-emerald-200':'bg-rose-600 shadow-rose-200'} text-white py-6 rounded-[28px] font-black text-xl shadow-2xl active:scale-95 transition-all`;
-            
-            // 状态标签
-            getEl('typeText').innerText = isIn ? '产品入库 (+)' : '发货出库 (-)';
-            const iconHtml = isIn ? '<i data-lucide="download" class="w-5 h-5"></i>' : '<i data-lucide="upload" class="w-5 h-5"></i>';
-            getEl('typeIcon').innerHTML = iconHtml;
-            
-            lucide.createIcons();
-            openModal('transModal');
-        }
-
-        async function doSaveTrans() {
-            const btn = getEl('btnSaveTrans'); if(btn.disabled) return;
-            const type = getEl('tType').value;
-            const isN = getEl('isNew').checked && type === 'in';
-            getEl('globalLoading').classList.remove('hidden');
-            try {
-                btn.disabled = true; 
-                btn.innerText = '正在同步数据...';
-                let pid = getEl('tProd').value;
-                if(isN) {
-                    btn.innerText = '正在建立新产品档案...';
-                    const cust = await getOrCreateCustomer(getEl('qCust').value, getEl('qCustAddr').value, getEl('qCustPhone').value);
-                    const fd = new FormData();
-                    const qMap = { name:'qName', category:'qCat', unitPrice:'qPrice', currency:'qCurr', factoryId:'qFact', packaging:'qPack', sku:'qSku', spec:'qSpec', material:'qMat' };
-                    for(let k in qMap) { fd.append(k, getEl(qMap[k]).value); }
-                    fd.append('customerName', cust?.name || '通用'); 
-                    if(getEl('qImage').files[0]) {
-                        const compressed = await compressImage(getEl('qImage').files[0]);
-                        fd.append('image', compressed, 'compressed.jpg');
-                    }
-                    const r = await api.post('/products', fd); 
-                    pid = r.data.id;
-                }
-                if(!pid && !isN) {
-                    getEl('globalLoading').classList.add('hidden');
-                    return toast('⚠️ 请选择产品', 'bg-amber-500');
-                }
-                
-                // 如果是出库且填写了客户，自动建立/关联客户关系
-                if(type === 'out' && getEl('tCustomer').value) {
-                    await getOrCreateCustomer(getEl('tCustomer').value);
-                }
-                
-                btn.innerText = '正在保存流水记录...';
-                const tfd = new FormData(); 
-                tfd.append('productId', pid); 
-                tfd.append('type', type); 
-                tfd.append('quantity', getEl('tQty').value); 
-                tfd.append('orderNo', getEl('tOrder').value); 
-                tfd.append('logisticsNo', getEl('tLog').value); 
-                tfd.append('customerName', (type === 'out' && getEl('tCustomer').value) ? getEl('tCustomer').value : '');
-                tfd.append('notes', getEl('tNotes').value);
-                if(getEl('tImage').files[0]) {
-                    const compressed = await compressImage(getEl('tImage').files[0]);
-                    tfd.append('transImage', compressed, 'compressed.jpg');
-                }
-                await api.post('/transactions', tfd); 
-                
-                const finalInv = await api.get('/inventory');
-                products = finalInv.data;
-                resetTransModal(); 
-                closeModal('transModal'); 
-                renderTrans(); 
-                renderInventory(); 
-                toast('✅ 业务已成功同步', 'bg-emerald-600');
-            } catch (e) { 
-                console.error('Save Transaction Error:', e);
-                toast('❌ 提交失败：请检查网络或必填项', 'bg-red-600'); 
-            } finally { 
-                btn.disabled = false; 
-                btn.innerText = '立即提交业务记录';
-                getEl('globalLoading').classList.add('hidden');
-            }
-        }
-
-        async function doSaveTrans() {
-            const btn = getEl('btnSaveTrans'); if(btn.disabled) return;
-            const type = getEl('tType').value;
-            const isN = getEl('isNew').checked && type === 'in';
-            getEl('globalLoading').classList.remove('hidden');
-            try {
-                btn.disabled = true; 
-                btn.innerText = '正在同步数据...';
-                let pid = getEl('tProd').value;
-                if(isN) {
-                    btn.innerText = '正在建立新产品档案...';
-                    const cust = await getOrCreateCustomer(getEl('qCust').value, getEl('qCustAddr').value, getEl('qCustPhone').value);
-                    const fd = new FormData();
-                    const qMap = { name:'qName', category:'qCat', unitPrice:'qPrice', currency:'qCurr', factoryId:'qFact', packaging:'qPack', sku:'qSku', spec:'qSpec', material:'qMat' };
-                    for(let k in qMap) { fd.append(k, getEl(qMap[k]).value); }
-                    fd.append('customerName', cust?.name || '通用'); 
-                    if(getEl('qImage').files[0]) {
-                        const compressed = await compressImage(getEl('qImage').files[0]);
-                        fd.append('image', compressed, 'compressed.jpg');
-                    }
-                    const r = await api.post('/products', fd); 
-                    pid = r.data.id;
-                }
-                if(!pid && !isN) {
-                    getEl('globalLoading').classList.add('hidden');
-                    return toast('⚠️ 请选择产品', 'bg-amber-500');
-                }
-                
-                // 如果是出库且填写了客户，自动建立/关联客户关系
-                if(type === 'out' && getEl('tCustomer').value) {
-                    await getOrCreateCustomer(getEl('tCustomer').value);
-                }
-                
-                btn.innerText = '正在保存流水记录...';
-                const tfd = new FormData(); 
-                tfd.append('productId', pid); 
-                tfd.append('type', type); 
-                tfd.append('quantity', getEl('tQty').value); 
-                tfd.append('orderNo', getEl('tOrder').value); 
-                tfd.append('logisticsNo', getEl('tLog').value); 
-                tfd.append('customerName', (type === 'out' && getEl('tCustomer').value) ? getEl('tCustomer').value : '');
-                tfd.append('notes', getEl('tNotes').value);
-                if(getEl('tImage').files[0]) {
-                    const compressed = await compressImage(getEl('tImage').files[0]);
-                    tfd.append('transImage', compressed, 'compressed.jpg');
-                }
-                await api.post('/transactions', tfd); 
-                
-                const finalInv = await api.get('/inventory');
-                products = finalInv.data;
-                resetTransModal(); 
-                closeModal('transModal'); 
-                renderTrans(); 
-                renderInventory(); 
-                toast('✅ 业务已成功同步', 'bg-emerald-600');
-            } catch (e) { 
-                console.error('Save Transaction Error:', e);
-                toast('❌ 提交失败：请检查网络或必填项', 'bg-red-600'); 
-            } finally { 
-                btn.disabled = false; 
-                btn.innerText = '立即提交业务记录';
+                btn.disabled = false; btn.innerText = '立即提交业务记录';
                 getEl('globalLoading').classList.add('hidden');
             }
         }
@@ -1143,7 +996,6 @@
             getEl('detailTitle').innerText = '产品档案全景看板';
             getEl('detailContent').innerHTML = `
             <div class="space-y-8 animate-in fade-in duration-500">
-                <!-- 头部：核心标识 -->
                 <div class="flex flex-col md:flex-row items-center gap-8 bg-slate-50 p-8 rounded-[40px] border border-slate-100">
                     <img src="${p.image||''}" class="w-40 h-40 rounded-[32px] object-cover shadow-2xl border-4 border-white flex-shrink-0" onerror="this.src='https://via.placeholder.com/150?text=NO+IMAGE'">
                     <div class="text-center md:text-left min-w-0">
@@ -1152,38 +1004,27 @@
                         <p class="text-slate-400 font-mono tracking-[0.3em] uppercase text-sm">${p.sku}</p>
                     </div>
                 </div>
-
-                <!-- 核心参数网格 -->
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
                     <div class="glass-card p-6"><p class="text-[10px] font-black text-slate-400 uppercase mb-2">材质工艺</p><p class="font-black text-slate-700">${p.material || '-'}</p></div>
                     <div class="glass-card p-6"><p class="text-[10px] font-black text-slate-400 uppercase mb-2">规格(片/包)</p><p class="font-black text-slate-700">${p.packaging || '-'}</p></div>
                     <div class="glass-card p-6"><p class="text-[10px] font-black text-slate-400 uppercase mb-2">产品尺寸</p><p class="font-black text-slate-700">${p.spec || '-'}</p></div>
                     <div class="glass-card p-6"><p class="text-[10px] font-black text-slate-400 uppercase mb-2">关联客户</p><p class="font-black text-indigo-600">${p.customerName || '通用客户'}</p></div>
                     <div class="glass-card p-6"><p class="text-[10px] font-black text-slate-400 uppercase mb-2">代工工厂</p><p class="font-black text-amber-600">${fact ? fact.name : '未指派'}</p></div>
-                    <div class="glass-card p-6"><p class="text-[10px] font-black text-slate-400 uppercase mb-2">档案创建人</p><p class="font-black text-slate-500 text-xs">${p.creatorName || 'SYSTEM'}</p></div>
+                    <div class="glass-card p-6"><p class="text-[10px] font-black text-slate-400 uppercase mb-2">最后经办</p><p class="font-black text-slate-500 text-xs">${p.lastOperator || 'SYSTEM'}</p></div>
                 </div>
-
-                <!-- 财务与库存 -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="p-8 bg-slate-900 rounded-[40px] text-white shadow-xl relative overflow-hidden">
                         <i data-lucide="database" class="absolute -right-4 -bottom-4 w-32 h-32 opacity-10"></i>
                         <p class="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-4">当前实时库存量</p>
-                        <div class="flex items-baseline space-x-2">
-                            <span class="text-6xl font-black tracking-tighter">${p.balance}</span>
-                            <span class="text-sm font-bold opacity-40 uppercase">Bags</span>
-                        </div>
+                        <div class="flex items-baseline space-x-2"><span class="text-6xl font-black tracking-tighter">${p.balance}</span><span class="text-sm font-bold opacity-40 uppercase">Bags</span></div>
                     </div>
                     <div class="p-8 bg-emerald-600 rounded-[40px] text-white shadow-xl relative overflow-hidden">
                         <i data-lucide="trending-up" class="absolute -right-4 -bottom-4 w-32 h-32 opacity-10"></i>
                         <p class="text-[10px] text-emerald-100/50 font-black uppercase tracking-widest mb-4">库存总资产价值</p>
-                        <div class="flex items-baseline space-x-2">
-                            <span class="text-5xl font-black tracking-tighter">${formatMoney(p.balance * p.unitPrice, p.currency)}</span>
-                        </div>
+                        <div class="flex items-baseline space-x-2"><span class="text-5xl font-black tracking-tighter">${formatMoney(p.balance * p.unitPrice, p.currency)}</span></div>
                         <p class="text-[10px] mt-2 opacity-60 font-bold">单价基准: ${formatMoney(p.unitPrice, p.currency)} (${p.currency})</p>
                     </div>
                 </div>
-
-                <!-- 备注信息 -->
                 <div class="p-10 bg-amber-50 rounded-[48px] border-2 border-amber-100/50">
                     <p class="text-[10px] text-amber-500 font-black mb-4 uppercase tracking-widest">Master Notes 档案备注</p>
                     <p class="text-lg font-bold italic text-amber-900 leading-relaxed">"${p.notes || '暂无详细的产品说明备注'}"</p>
@@ -1200,29 +1041,14 @@
                 getEl('detailTitle').innerText = '业务流程流水追溯';
                 getEl('detailContent').innerHTML = `
                 <div class="space-y-8 animate-in zoom-in-95 duration-500">
-                    <!-- 顶部：业务状态条 -->
                     <div class="bg-slate-900 p-6 rounded-[32px] text-white flex justify-between items-center shadow-2xl">
-                        <div class="flex items-center">
-                            <i data-lucide="clock" class="w-4 h-4 mr-3 text-slate-500"></i>
-                            <span class="text-xs font-black uppercase tracking-widest">${new Date(t.date).toLocaleString()}</span>
-                        </div>
-                        <div class="flex items-center space-x-3">
-                            <span class="text-[10px] text-slate-500 font-black uppercase">业务员: ${t.username}</span>
-                            <span class="px-5 py-2 rounded-2xl ${isIn?'bg-emerald-500':'bg-rose-500'} text-[10px] font-black uppercase tracking-widest shadow-lg shadow-${isIn?'emerald':'rose'}-500/20">${isIn?'入库记录 (IN)':'出库发货 (OUT)'}</span>
-                        </div>
+                        <div class="flex items-center"><i data-lucide="clock" class="w-4 h-4 mr-3 text-slate-500"></i><span class="text-xs font-black uppercase tracking-widest">${new Date(t.date).toLocaleString()}</span></div>
+                        <div class="flex items-center space-x-3"><span class="text-[10px] text-slate-500 font-black uppercase">业务员: ${t.username}</span><span class="px-5 py-2 rounded-2xl ${isIn?'bg-emerald-500':'bg-rose-500'} text-[10px] font-black uppercase tracking-widest shadow-lg shadow-${isIn?'emerald':'rose'}-500/20">${isIn?'入库记录 (IN)':'出库发货 (OUT)'}</span></div>
                     </div>
-
-                    <!-- 产品上下文预览 -->
                     <div class="flex items-center gap-6 p-6 bg-slate-50 rounded-[32px] border border-slate-100">
                         <img src="${p?.image||''}" class="w-20 h-20 rounded-2xl object-cover shadow-lg border-2 border-white" onerror="this.src='https://via.placeholder.com/150?text=N/A'">
-                        <div class="min-w-0">
-                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">关联产品档案</p>
-                            <h4 class="text-2xl font-black text-slate-800 tracking-tighter truncate">${p ? p.name : '产品已被移除'}</h4>
-                            <p class="text-xs font-mono text-slate-400 tracking-widest">${p?.sku || 'UNKNOWN'}</p>
-                        </div>
+                        <div class="min-w-0"><p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">关联产品档案</p><h4 class="text-2xl font-black text-slate-800 tracking-tighter truncate">${p ? p.name : '产品已被移除'}</h4><p class="text-xs font-mono text-slate-400 tracking-widest">${p?.sku || 'UNKNOWN'}</p></div>
                     </div>
-
-                    <!-- 核心数据网格 -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="glass-card p-8 shadow-sm flex justify-between items-center">
                             <div><p class="text-[10px] font-black text-slate-400 uppercase mb-2">变动数量 (Bags)</p><p class="text-5xl font-black ${isIn?'text-emerald-600':'text-rose-600'} tracking-tighter">${isIn?'+':'-'}${t.quantity.toLocaleString()}</p></div>
@@ -1233,30 +1059,11 @@
                             <div class="bg-slate-50 p-4 rounded-2xl"><i data-lucide="dollar-sign" class="w-8 h-8 text-indigo-500"></i></div>
                         </div>
                     </div>
-
-                    <!-- 物流追溯区 -->
                     <div class="bg-slate-900 p-8 rounded-[48px] grid grid-cols-1 md:grid-cols-2 gap-10 shadow-inner border border-slate-800">
-                        <div class="space-y-2">
-                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center"><i data-lucide="file-text" class="w-3 h-3 mr-2"></i>关联订单编号</p>
-                            <p class="text-2xl font-black text-white font-mono break-all tracking-tight">${t.orderNo || '<span class="opacity-20">未关联单号</span>'}</p>
-                        </div>
-                        <div class="space-y-2">
-                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center"><i data-lucide="truck" class="w-3 h-3 mr-2"></i>物流追踪单号</p>
-                            <p class="text-2xl font-black text-indigo-400 font-mono break-all tracking-tight">${t.logisticsNo || '<span class="opacity-20">暂无物流信息</span>'}</p>
-                        </div>
+                        <div class="space-y-2"><p class="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center"><i data-lucide="file-text" class="w-3 h-3 mr-2"></i>关联订单编号</p><p class="text-2xl font-black text-white font-mono break-all tracking-tight">${t.orderNo || '<span class="opacity-20">未关联单号</span>'}</p></div>
+                        <div class="space-y-2"><p class="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center"><i data-lucide="truck" class="w-3 h-3 mr-2"></i>物流追踪单号</p><p class="text-2xl font-black text-indigo-400 font-mono break-all tracking-tight">${t.logisticsNo || '<span class="opacity-20">暂无物流信息</span>'}</p></div>
                     </div>
-
-                    <!-- 现场照片凭证 -->
-                    ${t.image ? `
-                    <div class="space-y-4">
-                        <p class="text-[10px] text-slate-400 font-black uppercase px-2 tracking-widest flex items-center"><i data-lucide="camera" class="w-3 h-3 mr-2"></i>业务现场实拍凭证</p>
-                        <div class="rounded-[56px] overflow-hidden shadow-2xl border-[10px] border-white inline-block w-full group relative">
-                            <img src="${t.image}" class="w-full h-auto max-h-[70vh] object-contain transition-transform duration-700 group-hover:scale-105">
-                            <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
-                        </div>
-                    </div>` : ''}
-
-                    <!-- 业务说明 -->
+                    ${t.image ? `<div class="space-y-4"><p class="text-[10px] text-slate-400 font-black uppercase px-2 tracking-widest flex items-center"><i data-lucide="camera" class="w-3 h-3 mr-2"></i>业务现场实拍凭证</p><div class="rounded-[56px] overflow-hidden shadow-2xl border-[10px] border-white inline-block w-full group relative"><img src="${t.image}" class="w-full h-auto max-h-[70vh] object-contain transition-transform duration-700 group-hover:scale-105"></div></div>` : ''}
                     <div class="p-10 bg-slate-50 rounded-[48px] border-2 border-slate-100 shadow-sm text-center">
                         <p class="text-[10px] text-slate-400 font-black mb-4 uppercase tracking-widest">业务说明备注</p>
                         <p class="text-xl md:text-2xl font-bold italic text-slate-600 leading-relaxed">"${t.notes || '暂无业务特殊交代说明'}"</p>
@@ -1276,236 +1083,33 @@
                     if(isS && !self && u.role !== 'admin') btns += `<button onclick="doDeleteUser('${u.id}','${u.username}')" class="ml-2 bg-rose-50 border border-rose-100 text-rose-500 px-4 py-2 rounded-xl font-black text-xs shadow-sm">删除</button>`;
                     if(isS && !self && u.role === 'staff') btns += `<button onclick="changeRole('${u.id}','manager')" class="ml-2 bg-emerald-50 border border-emerald-100 text-emerald-600 px-4 py-2 rounded-xl font-black text-xs">提升</button>`;
                     if(isS && !self && u.role === 'manager') btns += `<button onclick="changeRole('${u.id}','staff')" class="ml-2 bg-rose-50 border border-rose-100 text-rose-500 px-4 py-2 rounded-xl font-black text-xs">撤销</button>`;
-                    
-                    return `
-                    <!-- 移动端卡片 -->
-                    <div class="md:hidden glass-card p-6 space-y-4 mb-4">
-                        <div class="flex justify-between items-start">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center font-black text-indigo-500 text-xs">${u.username.charAt(0).toUpperCase()}</div>
-                                <div>
-                                    <div class="font-black text-slate-800 text-sm">${u.username} ${self?'<span class="text-[9px] text-indigo-400 font-black">(本人)</span>':''}</div>
-                                    <div class="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md inline-block ${roleColor} mt-1">${u.role}</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="flex items-center justify-between pt-4 border-t border-slate-50">
-                            <div class="text-[11px] font-bold text-slate-400">📱 ${u.phone||'-'}</div>
-                            <div class="flex space-x-1">${btns}</div>
-                        </div>
-                    </div>
-                    <!-- 桌面端行 -->
-                    <tr class="hidden md:table-row text-sm border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                        <td class="p-6">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-black text-slate-400 text-xs">${u.username.charAt(0).toUpperCase()}</div>
-                                <div class="font-black text-slate-700">${u.username} ${self?'(本人)':''}</div>
-                            </div>
-                        </td>
-                        <td class="p-6 uppercase font-bold text-slate-300 text-[10px] tracking-widest">${u.role}</td>
-                        <td class="p-6 text-slate-400 font-mono text-xs">${u.phone||'-'}</td>
-                        <td class="p-6 text-right">${btns}</td>
-                    </tr>`;
+                    return `<tr class="text-sm border-b border-slate-50 hover:bg-slate-50/50 transition-colors"><td class="p-6"><div class="flex items-center space-x-3"><div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-black text-slate-400 text-xs">${u.username.charAt(0).toUpperCase()}</div><div class="font-black text-slate-700">${u.username} ${self?'(本人)':''}</div></div></td><td class="p-6 uppercase font-bold text-slate-300 text-[10px] tracking-widest">${u.role}</td><td class="p-6 text-slate-400 font-mono text-xs">${u.phone||'-'}</td><td class="p-6 text-right">${btns}</td></tr>`;
                 }).join('');
-                getEl('userListTable').innerHTML = list;
-                lucide.createIcons();
+                getEl('userListTable').innerHTML = list; lucide.createIcons();
             } catch(e) {}
         }
         
-                async function doDeleteUser(id, name) {
-            customConfirm(`彻底从系统移除员工 [${name}]？此操作不可撤销且将导致其无法登录。`, async () => {
-                try {
-                    await api.delete(`/admin/users/${id}`);
-                    toast('✅ 账号已从系统中注销', 'bg-emerald-600');
-                    fetchUsers();
-                } catch(e) {
-                    toast('❌ 操作失败：' + (e.response?.data?.message || '无法删除最高管理员或本人'), 'bg-red-600');
-                }
-            });
-        }
-                async function changeRole(userId, newRole) { 
-            customConfirm('确认调整该账户权限？', async () => { 
-                try {
-                    await api.post('/admin/change-role', { userId, newRole }); 
-                    fetchUsers(); 
-                    toast('✅ 权限状态已实时同步', 'bg-emerald-500'); 
-                } catch(e) { toast('❌ 调整失败', 'bg-red-600'); }
-            }); 
-        }
-                async function doDeleteProduct(id) { 
-            customConfirm('彻底删除档案？已有流水则无法删除。', async () => { 
-                try { 
-                    await api.delete(`/products/${id}`); 
-                    toast('✅ 已移除', 'bg-emerald-500'); 
-                    renderInventory(); 
-                } catch(e) { toast('❌ 无法删除：已有业务流水记录', 'bg-red-500'); } 
-            }); 
-        }
-                async function doDeleteTrans(id) { 
-            customConfirm('确认彻底撤销该笔流水记录？相关库存将同步调整且无法恢复。', async () => { 
-                try { 
-                    const res = await api.delete(`/transactions/${id}`); 
-                    toast('✅ 流水已成功撤销，数据已同步', 'bg-emerald-600'); 
-                    renderTrans(); 
-                    renderInventory(); 
-                } catch(e) { 
-                    const msg = e.response?.data?.message || '连接断开(ERR:Net)';
-                    const status = e.response?.status ? ` [Code: ${e.response.status}]` : '';
-                    toast('❌ 撤销失败：' + msg + status, 'bg-red-600'); 
-                } 
-            }); 
-        }
-                async function doDeleteFactory(id) { 
-            customConfirm('确认彻底删除该工厂档案？', async () => {
-                try { 
-                    await api.delete(`/factories/${id}`); 
-                    allFactories = allFactories.filter(f => f.id !== id);
-                    renderFactoryUI(); 
-                    toast('✅ 已成功移除', 'bg-emerald-500'); 
-                    fetchFactories(); 
-                } catch(e) { toast('❌ 删除失败', 'bg-red-500'); }
-            });
-        }
-        async function doDeleteCustomer(id) { 
-            customConfirm('确认彻底删除该客户档案？', async () => {
-                try { 
-                    await api.delete(`/customers/${id}`); 
-                    // 立即在本地内存中移除，实现瞬间消失
-                    allCustomers = allCustomers.filter(c => c.id !== id);
-                    renderCustomerUI();
-                    toast('✅ 已成功移除', 'bg-emerald-500'); 
-                    // 后台同步
-                    fetchCustomers();
-                } catch(e) { toast('❌ 删除失败', 'bg-red-500'); }
-            });
-        }
+        async function doDeleteUser(id, name) { customConfirm(`彻底从系统移除员工 [${name}]？此操作不可撤销且将导致其无法登录。`, async () => { try { await api.delete(`/admin/users/${id}`); toast('✅ 账号已从系统中注销', 'bg-emerald-600'); fetchUsers(); } catch(e) { toast('❌ 操作失败：' + (e.response?.data?.message || '无法删除最高管理员或本人'), 'bg-red-600'); } }); }
+        async function changeRole(userId, newRole) { customConfirm('确认调整该账户权限？', async () => { try { await api.post('/admin/change-role', { userId, newRole }); fetchUsers(); toast('✅ 权限状态已实时同步', 'bg-emerald-500'); } catch(e) { toast('❌ 调整失败', 'bg-red-600'); } }); }
+        async function doDeleteProduct(id) { customConfirm('彻底删除档案？已有流水则无法删除。', async () => { try { await api.delete(`/products/${id}`); toast('✅ 已移除', 'bg-emerald-500'); renderInventory(); } catch(e) { toast('❌ 无法删除：已有业务流水记录', 'bg-red-500'); } }); }
+        async function doDeleteTrans(id) { customConfirm('确认彻底撤销该笔流水记录？相关库存将同步调整且无法恢复。', async () => { try { await api.delete(`/transactions/${id}`); toast('✅ 流水已成功撤销，数据已同步', 'bg-emerald-600'); renderTrans(); renderInventory(); } catch(e) { toast('❌ 撤销失败', 'bg-red-600'); } }); }
+        async function doDeleteFactory(id) { customConfirm('确认彻底删除该工厂档案？', async () => { try { await api.delete(`/factories/${id}`); allFactories = allFactories.filter(f => f.id !== id); renderFactoryUI(); toast('✅ 已成功移除', 'bg-emerald-500'); fetchFactories(); } catch(e) { toast('❌ 删除失败', 'bg-red-500'); } }); }
+        async function doDeleteCustomer(id) { customConfirm('确认彻底删除该客户档案？', async () => { try { await api.delete(`/customers/${id}`); allCustomers = allCustomers.filter(c => c.id !== id); renderCustomerUI(); toast('✅ 已成功移除', 'bg-emerald-500'); fetchCustomers(); } catch(e) { toast('❌ 删除失败', 'bg-red-500'); } }); }
+        async function doSaveFactory() { try { const payload = { name: getEl('fName').value, address: getEl('fAddr').value }; if(!payload.name) return toast('⚠️ 请填写工厂名称', 'bg-amber-500'); const res = await api.post('/factories', payload); allFactories.push(res.data); toast('✅ 工厂档案已建立', 'bg-emerald-500'); closeModal('factoryModal'); renderFactoryUI(); fetchFactories(); } catch(e) { toast('❌ 保存失败', 'bg-red-500'); } }
+        async function doSaveCustomer() { try { const payload = { name: getEl('cName').value, address: getEl('cAddr').value, phone: getEl('cPhone').value }; if(!payload.name) return toast('⚠️ 请填写客户名称', 'bg-amber-500'); const res = await api.post('/customers', payload); allCustomers.push(res.data); toast('✅ 客户档案已成功建立', 'bg-emerald-500'); closeModal('customerModal'); renderCustomerUI(); fetchCustomers(); } catch(e) { toast('❌ 保存失败', 'bg-red-500'); } }
 
-        
-        async function doSaveFactory() { 
-            try { 
-                const payload = { name: getEl('fName').value, address: getEl('fAddr').value };
-                if(!payload.name) return toast('⚠️ 请填写工厂名称', 'bg-amber-500');
-                const res = await api.post('/factories', payload); 
-                allFactories.push(res.data);
-                toast('✅ 工厂档案已建立', 'bg-emerald-500'); 
-                closeModal('factoryModal'); 
-                renderFactoryUI();
-                fetchFactories(); 
-            } catch(e) { toast('❌ 保存失败', 'bg-red-500'); }
-        }
-        async function doSaveCustomer() { 
-            try { 
-                const payload = { name: getEl('cName').value, address: getEl('cAddr').value, phone: getEl('cPhone').value };
-                if(!payload.name) return toast('⚠️ 请填写客户名称', 'bg-amber-500');
-                const res = await api.post('/customers', payload); 
-                
-                // 立即更新本地数据，实现秒级展示
-                allCustomers.push(res.data);
-                toast('✅ 客户档案已成功建立', 'bg-emerald-500'); 
-                closeModal('customerModal'); 
-                
-                // 立即重绘 UI
-                renderCustomerUI();
-                
-                // 后台同步一次数据
-                fetchCustomers();
-            } catch(e) { toast('❌ 保存失败', 'bg-red-500'); }
-        }
-
-        function renderFactoryUI() { 
-            const isAdmin = currentUser.role === 'admin' || currentUser.role === 'manager';
-            getEl('factoryListContent').innerHTML = allFactories.map(f => `
-                <div class="glass-card p-8 border-t-[12px] shadow-lg relative group" style="border-color:${f.color}">
-                    ${isAdmin ? `<button onclick="doDeleteFactory('${f.id}')" class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 text-rose-300 hover:text-rose-600 transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
-                    <h4 class="text-2xl font-black text-slate-800 mb-2">${f.name}</h4>
-                    <p class="text-xs text-slate-400 font-bold tracking-widest">${f.address || '未录入生产地址'}</p>
-                </div>`).join(''); 
-            lucide.createIcons();
-        }
-        function renderCustomerUI() { 
-            const isAdmin = currentUser.role === 'admin' || currentUser.role === 'manager';
-            // 权限隔离优化：管理员见全部；员工见自己创建的 或 与自己产品相关的
-            const filtered = allCustomers.filter(c => {
-                if (isAdmin) return true;
-                const isCreator = c.createdBy === currentUser.id;
-                const hasRelatedProduct = products.some(p => p.customerName === c.name && p.createdBy === currentUser.id);
-                return isCreator || hasRelatedProduct;
-            });
-            
-            getEl('customerListContent').innerHTML = filtered.map(c => `
-                <div class="glass-card p-8 flex flex-col justify-between min-h-[160px] shadow-sm relative group">
-                    ${isAdmin ? `<button onclick="doDeleteCustomer('${c.id}')" class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 text-rose-300 hover:text-rose-600 transition-all active:scale-90"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
-                    <h4 class="text-2xl font-black text-slate-800 tracking-tighter">${c.name}</h4>
-                    <div class="space-y-1">
-                        <p class="text-xs text-slate-400 font-bold">${c.address || '暂无详细发货地址'}</p>
-                        <p class="text-xs text-indigo-500 font-black tracking-widest">${c.phone || '-'}</p>
-                    </div>
-                </div>`).join(''); 
-            lucide.createIcons();
-        }
-        function renderCategoryUI() { 
-            getEl('categoryList').innerHTML = allCategories.map(c => {
-                // 使用 base64 或 16进制编码来安全传递中文字符串作为参数
-                const safeName = btoa(unescape(encodeURIComponent(c)));
-                return `
-                <div class="px-5 py-2.5 bg-indigo-50 text-indigo-600 rounded-2xl text-[11px] font-black flex items-center border border-indigo-100/50 shadow-sm transition-all hover:scale-105">
-                    <span>${c}</span>
-                    <button onclick="handleDeleteCategory('${safeName}')" class="ml-3 p-1 opacity-40 hover:opacity-100 hover:text-rose-500 transition-all font-bold text-lg">×</button>
-                </div>`;
-            }).join(''); 
-        }
-
-        async function handleDeleteCategory(encodedName) {
-            const n = decodeURIComponent(escape(atob(encodedName)));
-            if(!confirm(`彻底销毁品类 [${n}] 吗？此操作将从全局目录移除该选项。`)) return;
-            try {
-                await api.delete(`/categories/${encodeURIComponent(n)}`);
-                toast('✅ 品类已成功销毁', 'bg-emerald-600');
-                fetchCategories();
-            } catch(e) {
-                toast('❌ 销毁失败：权限不足或网络异常', 'bg-red-600');
-            }
-        }
-
-        
-        async function addCategory() { const n = getEl('newCatName').value; if(!n) return; await api.post('/categories', { name: n }); getEl('newCatName').value=''; fetchCategories(); toast('✅ 品类目录已更新', 'bg-emerald-500'); }
-        async function updateProfile(isU) { 
-            const payload = isU ? { newUsername: getEl('settingNewUsername').value } : { oldPassword: getEl('oldPass').value, newPassword: getEl('newPass').value };
-            try { const res = await api.post('/update-profile', payload); toast('✅ 资料已实时同步', 'bg-emerald-600'); if(isU) { localStorage.setItem('user', JSON.stringify(res.data.user)); setTimeout(() => location.reload(), 1000); } else { getEl('oldPass').value=''; getEl('newPass').value=''; } } 
-            catch(e) { toast('❌ 操作失败', 'bg-red-500'); }
-        }
+        function renderFactoryUI() { const isAdmin = currentUser.role !== 'staff'; getEl('factoryListContent').innerHTML = allFactories.map(f => `<div class="glass-card p-8 border-t-[12px] shadow-lg relative group" style="border-color:${f.color}">${isAdmin ? `<button onclick="doDeleteFactory('${f.id}')" class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 text-rose-300 hover:text-rose-600 transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}<h4 class="text-2xl font-black text-slate-800 mb-2">${f.name}</h4><p class="text-xs text-slate-400 font-bold tracking-widest">${f.address || '未录入生产地址'}</p></div>`).join(''); lucide.createIcons(); }
+        function renderCustomerUI() { const isAdmin = currentUser.role !== 'staff'; const filtered = allCustomers.filter(c => isAdmin || c.createdBy === currentUser.id); getEl('customerListContent').innerHTML = filtered.map(c => `<div class="glass-card p-8 flex flex-col justify-between min-h-[160px] shadow-sm relative group">${isAdmin ? `<button onclick="doDeleteCustomer('${c.id}')" class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 text-rose-300 hover:text-rose-600 transition-all active:scale-90"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}<h4 class="text-2xl font-black text-slate-800 tracking-tighter">${c.name}</h4><div class="space-y-1"><p class="text-xs text-slate-400 font-bold">${c.address || '暂无详细发货地址'}</p><p class="text-xs text-indigo-500 font-black tracking-widest">${c.phone || '-'}</p></div></div>`).join(''); lucide.createIcons(); }
+        function renderCategoryUI() { getEl('categoryList').innerHTML = allCategories.map(c => { const safeName = btoa(unescape(encodeURIComponent(c))); return `<div class="px-5 py-2.5 bg-indigo-50 text-indigo-600 rounded-2xl text-[11px] font-black flex items-center border border-indigo-100/50 shadow-sm transition-all hover:scale-105"><span>${c}</span><button onclick="handleDeleteCategory('${safeName}')" class="ml-3 p-1 opacity-40 hover:opacity-100 hover:text-rose-500 transition-all font-bold text-lg">×</button></div>`; }).join(''); }
+        async function handleDeleteCategory(encodedName) { const n = decodeURIComponent(escape(atob(encodedName))); if(!confirm(`彻底销毁品类 [${n}] 吗？`)) return; try { await api.delete(`/categories/${encodeURIComponent(n)}`); toast('✅ 已销毁', 'bg-emerald-600'); fetchCategories(); } catch(e) { toast('❌ 失败', 'bg-red-600'); } }
+        async function addCategory() { const n = getEl('newCatName').value; if(!n) return; await api.post('/categories', { name: n }); getEl('newCatName').value=''; fetchCategories(); toast('✅ 已更新', 'bg-emerald-500'); }
+        async function updateProfile(isU) { const payload = isU ? { newUsername: getEl('settingNewUsername').value } : { oldPassword: getEl('oldPass').value, newPassword: getEl('newPass').value }; try { const res = await api.post('/update-profile', payload); toast('✅ 已同步', 'bg-emerald-600'); if(isU) { localStorage.setItem('user', JSON.stringify(res.data.user)); setTimeout(() => location.reload(), 1000); } else { getEl('oldPass').value=''; getEl('newPass').value=''; } } catch(e) { toast('❌ 失败', 'bg-red-500'); } }
 
         function openAddProdModal() { getEl('editProdId').value=''; ['pName','pSku','pPrice','pPack','pNotes','pCust','pCustAddr','pCustPhone','pMat','pSpec'].forEach(id => { const el = getEl(id); if(el) el.value=''; }); getEl('pCurr').value='CNY'; getEl('prodModalTitle').innerText = '档案录入'; openModal('prodModal'); updateDynamicHints('p'); }
-        function openEditModal(id) { 
-            const p = products.find(x => x.id === id); 
-            getEl('editProdId').value = p.id; 
-            
-            // 显式映射字段，解决原有代码回填失败的问题
-            getEl('pName').value = p.name || '';
-            getEl('pSku').value = p.sku || '';
-            getEl('pPrice').value = p.unitPrice || '';
-            getEl('pPack').value = p.packaging || '';
-            getEl('pNotes').value = p.notes || '';
-            getEl('pCust').value = p.customerName || '';
-            getEl('pMat').value = p.material || '';
-            getEl('pSpec').value = p.spec || '';
-            
-            // 尝试从本地客户列表中匹配并回填联系信息
-            const cust = allCustomers.find(c => c.name === p.customerName);
-            getEl('pCustAddr').value = cust ? (cust.address || '') : '';
-            getEl('pCustPhone').value = cust ? (cust.phone || '') : '';
-
-            getEl('pCat').value = p.category || ''; 
-            getEl('pFact').value = p.factoryId || ''; 
-            getEl('pCurr').value = p.currency || 'CNY'; 
-            
-            getEl('prodModalTitle').innerText = '档案修改'; 
-            updateDynamicHints('p'); 
-            openModal('prodModal'); 
-        }
+        function openEditModal(id) { const p = products.find(x => x.id === id); getEl('editProdId').value = p.id; ['pName','pSku','pPrice','pPack','pNotes','pCust','pMat','pSpec'].forEach(f => { getEl(f).value = p[f.replace('p', '').toLowerCase()] || ''; }); getEl('pName').value = p.name; getEl('pSku').value = p.sku; getEl('pPrice').value = p.unitPrice; getEl('pPack').value = p.packaging; getEl('pCust').value = p.customerName; const cust = allCustomers.find(c => c.name === p.customerName); getEl('pCustAddr').value = cust ? cust.address : ''; getEl('pCustPhone').value = cust ? cust.phone : ''; getEl('pCat').value = p.category || ''; getEl('pFact').value = p.factoryId || ''; getEl('pCurr').value = p.currency || 'CNY'; getEl('prodModalTitle').innerText = '档案修改'; updateDynamicHints('p'); openModal('prodModal'); }
         function toggleQuickFields() { const isN = getEl('isNew').checked; getEl('oldPBox').classList.toggle('hidden', isN); getEl('newPBox').classList.toggle('hidden', !isN); if(isN) updateDynamicHints('q'); }
         function previewImg(u) { getEl('imgPreviewContent').src = u; getEl('imgPreviewOverlay').classList.remove('hidden'); }
-        function updateProductSelects() { const el = getEl('tProd'); if(el) el.innerHTML = '<option value="" disabled selected>🔍 搜索并选择产品档案...</option>' + products.map(p => `<option value="${p.id}">${p.name}  /  ${p.sku}</option>`) .join(''); }
+        function updateProductSelects() { const el = getEl('tProd'); if(el) el.innerHTML = '<option value="" disabled selected>🔍 选择产品...</option>' + products.map(p => `<option value="${p.id}">${p.name} / ${p.sku}</option>`).join(''); }
 
         initApp();
     </script>
