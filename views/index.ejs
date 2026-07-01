@@ -345,7 +345,7 @@
             <div class="space-y-6 modal-scroll detail-scroll-fix flex-1 pr-2 pb-10">
                 <input type="hidden" id="editProdId" autocomplete="off">
                 <div class="grid grid-cols-2 gap-4"><div><select id="pCat" onchange="updateDynamicHints('p')" class="w-full bg-slate-100 p-5 rounded-[22px] font-black border-0 outline-none"></select></div><div><select id="pFact" class="w-full bg-slate-100 p-5 rounded-[22px] font-black border-0 outline-none"></select></div></div>
-                <input type="text" id="pCust" list="customerDataList" placeholder="所属客户" class="w-full bg-slate-100 p-5 rounded-[22px] font-black border-0 outline-none" autocomplete="off">
+                <input type="text" id="pCust" list="customerDataList" placeholder="所属客户 (选填)" class="w-full bg-slate-100 p-5 rounded-[22px] font-black border-0 outline-none" autocomplete="off">
                 <div class="grid grid-cols-2 gap-4"><input type="text" id="pCustAddr" placeholder="发货地址 (选填)" class="p-5 bg-slate-50 rounded-[22px] border-0 text-sm outline-none" autocomplete="off"><input type="text" id="pCustPhone" placeholder="联系电话 (选填)" class="p-5 bg-slate-50 rounded-[22px] border-0 text-sm outline-none" autocomplete="off"></div>
                 <input type="text" id="pName" placeholder="产品展示全称" class="w-full bg-slate-100 p-5 rounded-[22px] font-black border-0" autocomplete="off">
                 <div class="grid grid-cols-2 gap-4"><input type="text" id="pSku" placeholder="货号 SKU" class="p-5 bg-slate-50 rounded-[22px] border-0 font-mono tracking-widest" autocomplete="off"><input type="text" id="pPack" placeholder="规格 (片/包)" class="p-5 bg-slate-50 rounded-[22px] border-0" autocomplete="off"></div>
@@ -372,7 +372,7 @@
                 <div id="oldPBox"><select id="tProd" class="w-full bg-slate-100 p-6 rounded-[24px] font-black border-0 outline-none"></select></div>
                 <div id="newPBox" class="hidden space-y-4 p-6 bg-slate-50 rounded-[32px] border border-indigo-100 shadow-inner">
                     <div class="grid grid-cols-2 gap-3"><select id="qCat" onchange="updateDynamicHints('q')" class="p-5 rounded-2xl bg-white border-0 font-black outline-none"></select><select id="qFact" class="p-5 rounded-2xl bg-white border-0 font-black outline-none"></select></div>
-                    <input type="text" id="qCust" list="customerDataList" placeholder="所属客户" class="w-full p-5 rounded-2xl bg-white font-black border-0 outline-none" autocomplete="off">
+                    <input type="text" id="qCust" list="customerDataList" placeholder="所属客户 (选填)" class="w-full p-5 rounded-2xl bg-white font-black border-0 outline-none" autocomplete="off">
                     <div class="grid grid-cols-2 gap-2"><input type="text" id="qCustAddr" placeholder="地址(选填)" class="p-5 rounded-2xl bg-slate-50 border-0 text-sm outline-none" autocomplete="off"><input type="text" id="qCustPhone" placeholder="电话(选填)" class="p-5 rounded-2xl bg-slate-50 border-0 text-sm outline-none" autocomplete="off"></div>
                     <input type="text" id="qName" placeholder="产品展示全名" class="w-full p-5 rounded-2xl bg-white font-black border-0 outline-none" autocomplete="off">
                     <div class="grid grid-cols-3 gap-2"><input type="number" id="qPrice" placeholder="单价" class="col-span-2 p-5 rounded-2xl bg-white border-0 outline-none" autocomplete="off"><select id="qCurr" class="p-5 rounded-2xl bg-white border-0 font-black outline-none"><option value="CNY">¥</option><option value="USD">$</option></select></div>
