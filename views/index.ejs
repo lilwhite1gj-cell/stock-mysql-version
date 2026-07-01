@@ -732,6 +732,7 @@
                     const p = products.find(x => x.id === t.productId), isIn = t.type === 'in';
                     const isAdmin = currentUser.role === 'admin' || currentUser.role === 'manager';
                     const customerTag = t.customerName ? `<span class="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md text-[9px] font-black border border-indigo-100/50 mr-2">${isIn?'来源':'去向'}: ${t.customerName}</span>` : '';
+                    const operatorTag = `<span class="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-md text-[9px] font-black border border-slate-200"><i data-lucide="user" class="w-2 h-2 inline mr-1"></i>经办: ${t.username}</span>`;
                     const imgPreview = t.image ? `<img src="${t.image}" class="w-16 h-16 md:w-20 md:h-20 rounded-2xl object-cover shadow-lg border-2 border-white cursor-zoom-in flex-shrink-0" onclick="event.stopPropagation(); previewImg('${t.image}')">` : `<div class="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-300 border-2 border-dashed border-slate-200 flex-shrink-0"><i data-lucide="image" class="w-6 h-6"></i></div>`;
                     const delBtn = isAdmin ? `<button onclick="event.stopPropagation(); doDeleteTrans('${t.id}')" class="p-2.5 bg-rose-50 text-rose-400 rounded-xl active:scale-90 transition-all hover:bg-rose-100"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : '';
                     
@@ -739,9 +740,10 @@
                     <div class="glass-card p-4 md:p-6 border-l-[6px] md:border-l-[10px] ${isIn ? 'border-emerald-500' : 'border-rose-500'} flex flex-row items-center gap-4 animate-in slide-in-from-bottom-2 shadow-sm hover:shadow-md transition-all clickable-row" onclick="showTransDetail('${t.id}')">
                         ${imgPreview}
                         <div class="flex-1 min-w-0">
-                            <div class="flex items-center space-x-2 mb-1">
+                            <div class="flex flex-wrap items-center gap-2 mb-1">
                                 <span class="text-[8px] font-black text-slate-300 tracking-widest uppercase">${new Date(t.date).toLocaleDateString()}</span>
                                 ${customerTag}
+                                ${operatorTag}
                             </div>
                             <h4 class="text-sm md:text-lg font-black truncate text-slate-800 tracking-tighter">${p ? p.name : '已删'}</h4>
                             <div class="flex items-center justify-between mt-2">
@@ -990,12 +992,41 @@
             }
         }
 
-        function showInvDetail(id) {
+        async function showInvDetail(id) {
             const p = products.find(x => x.id === id);
             const fact = allFactories.find(f => f.id === p.factoryId);
             getEl('detailTitle').innerText = '产品档案全景看板';
+            
+            // 实时获取该产品的所有流水记录
+            const transRes = await api.get('/transactions');
+            const pTrans = transRes.data.filter(t => String(t.productId) === String(id)).sort((a,b) => new Date(b.date) - new Date(a.date));
+            
+            const totalIn = pTrans.filter(t => t.type === 'in').reduce((s,t) => s + t.quantity, 0);
+            const totalOut = pTrans.filter(t => t.type === 'out').reduce((s,t) => s + t.quantity, 0);
+
+            let historyHtml = pTrans.length ? pTrans.map(t => {
+                const isIn = t.type === 'in';
+                return `
+                <div class="flex items-start space-x-4 p-4 bg-white rounded-2xl border border-slate-50 shadow-sm relative overflow-hidden group">
+                    <div class="absolute left-0 top-0 bottom-0 w-1.5 ${isIn?'bg-emerald-500':'bg-rose-500'}"></div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-[10px] font-black uppercase tracking-widest ${isIn?'text-emerald-600':'text-rose-600'}">${isIn?'入库记录':'发货出库'}</span>
+                            <span class="text-[9px] font-bold text-slate-300">${new Date(t.date).toLocaleString()}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <p class="font-black text-slate-700 text-sm">${isIn?'+':'-'}${t.quantity} <span class="text-[10px] opacity-40">Bags</span></p>
+                            <p class="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">${t.username}</p>
+                        </div>
+                        ${t.customerName ? `<p class="text-[9px] font-bold text-slate-400 mt-1">📍 ${isIn?'来源':'去向'}: ${t.customerName}</p>` : ''}
+                        ${t.notes ? `<p class="text-[9px] italic text-slate-400 mt-1 truncate">"${t.notes}"</p>` : ''}
+                    </div>
+                </div>`;
+            }).join('') : '<div class="py-10 text-center text-slate-300 font-bold text-xs uppercase tracking-[0.2em]">该货物尚未产生流转记录</div>';
+
             getEl('detailContent').innerHTML = `
             <div class="space-y-8 animate-in fade-in duration-500">
+                <!-- 头部：核心标识 -->
                 <div class="flex flex-col md:flex-row items-center gap-8 bg-slate-50 p-8 rounded-[40px] border border-slate-100">
                     <img src="${p.image||''}" class="w-40 h-40 rounded-[32px] object-cover shadow-2xl border-4 border-white flex-shrink-0" onerror="this.src='https://via.placeholder.com/150?text=NO+IMAGE'">
                     <div class="text-center md:text-left min-w-0">
@@ -1004,14 +1035,8 @@
                         <p class="text-slate-400 font-mono tracking-[0.3em] uppercase text-sm">${p.sku}</p>
                     </div>
                 </div>
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div class="glass-card p-6"><p class="text-[10px] font-black text-slate-400 uppercase mb-2">材质工艺</p><p class="font-black text-slate-700">${p.material || '-'}</p></div>
-                    <div class="glass-card p-6"><p class="text-[10px] font-black text-slate-400 uppercase mb-2">规格(片/包)</p><p class="font-black text-slate-700">${p.packaging || '-'}</p></div>
-                    <div class="glass-card p-6"><p class="text-[10px] font-black text-slate-400 uppercase mb-2">产品尺寸</p><p class="font-black text-slate-700">${p.spec || '-'}</p></div>
-                    <div class="glass-card p-6"><p class="text-[10px] font-black text-slate-400 uppercase mb-2">关联客户</p><p class="font-black text-indigo-600">${p.customerName || '通用客户'}</p></div>
-                    <div class="glass-card p-6"><p class="text-[10px] font-black text-slate-400 uppercase mb-2">代工工厂</p><p class="font-black text-amber-600">${fact ? fact.name : '未指派'}</p></div>
-                    <div class="glass-card p-6"><p class="text-[10px] font-black text-slate-400 uppercase mb-2">最后经办</p><p class="font-black text-slate-500 text-xs">${p.lastOperator || 'SYSTEM'}</p></div>
-                </div>
+
+                <!-- 数据指标汇总 -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="p-8 bg-slate-900 rounded-[40px] text-white shadow-xl relative overflow-hidden">
                         <i data-lucide="database" class="absolute -right-4 -bottom-4 w-32 h-32 opacity-10"></i>
@@ -1020,11 +1045,26 @@
                     </div>
                     <div class="p-8 bg-emerald-600 rounded-[40px] text-white shadow-xl relative overflow-hidden">
                         <i data-lucide="trending-up" class="absolute -right-4 -bottom-4 w-32 h-32 opacity-10"></i>
-                        <p class="text-[10px] text-emerald-100/50 font-black uppercase tracking-widest mb-4">库存总资产价值</p>
-                        <div class="flex items-baseline space-x-2"><span class="text-5xl font-black tracking-tighter">${formatMoney(p.balance * p.unitPrice, p.currency)}</span></div>
-                        <p class="text-[10px] mt-2 opacity-60 font-bold">单价基准: ${formatMoney(p.unitPrice, p.currency)} (${p.currency})</p>
+                        <p class="text-[10px] text-emerald-100/50 font-black uppercase tracking-widest mb-4">累计流转吞吐量</p>
+                        <div class="flex space-x-4">
+                            <div><p class="text-[8px] text-emerald-100/50 font-black uppercase">入库总计</p><p class="text-xl font-black">${totalIn}</p></div>
+                            <div><p class="text-[8px] text-emerald-100/50 font-black uppercase">出库总计</p><p class="text-xl font-black">${totalOut}</p></div>
+                        </div>
                     </div>
                 </div>
+
+                <!-- 经办历史流水 (新模块) -->
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between px-2">
+                        <h5 class="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">全生命周期流转追溯</h5>
+                        <span class="text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-lg">${pTrans.length} 笔记录</span>
+                    </div>
+                    <div class="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                        ${historyHtml}
+                    </div>
+                </div>
+
+                <!-- 档案备注 -->
                 <div class="p-10 bg-amber-50 rounded-[48px] border-2 border-amber-100/50">
                     <p class="text-[10px] text-amber-500 font-black mb-4 uppercase tracking-widest">Master Notes 档案备注</p>
                     <p class="text-lg font-bold italic text-amber-900 leading-relaxed">"${p.notes || '暂无详细的产品说明备注'}"</p>
