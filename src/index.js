@@ -87,7 +87,19 @@ if (process.env.MONGODB_URI) {
 // --- 云端模型定义 ---
 const User = mongoose.model('User', new mongoose.Schema({ username: {type:String, unique:true}, password: {type:String}, role: String, phone: String, securityQuestion: String, securityAnswer: String }));
 const Product = mongoose.model('Product', new mongoose.Schema({ name: String, sku: String, category: String, unitPrice: Number, currency: String, factoryId: String, customerName: String, packaging: String, spec: String, material: String, notes: String, image: String, createdBy: String, creatorName: String }));
-const Transaction = mongoose.model('Transaction', new mongoose.Schema({ productId: String, type: String, quantity: Number, orderNo: String, logisticsNo: String, notes: String, image: String, userId: String, username: String, date: { type: Date, default: Date.now } }));
+const Transaction = mongoose.model('Transaction', new mongoose.Schema({ 
+  productId: String, 
+  type: String, 
+  quantity: Number, 
+  orderNo: String, 
+  logisticsNo: String, 
+  customerName: String, // 新增：记录出库去向或入库来源
+  notes: String, 
+  image: String, 
+  userId: String, 
+  username: String, 
+  date: { type: Date, default: Date.now } 
+}));
 const Customer = mongoose.model('Customer', new mongoose.Schema({ name: String, address: String, phone: String, createdBy: String }));
 const Factory = mongoose.model('Factory', new mongoose.Schema({ name: String, address: String, color: String }));
 const Category = mongoose.model('Category', new mongoose.Schema({ name: String }));
@@ -176,11 +188,25 @@ app.post('/api/reset-password-now', async (req, res) => {
 
 app.get('/api/inventory', authenticate, async (req, res) => {
   const products = useCloudDB ? await Product.find() : getLocalData().products;
-  const transactions = useCloudDB ? await Transaction.find() : getLocalData().transactions;
+  const transactions = useCloudDB ? await Transaction.find().sort({ date: -1 }) : getLocalData().transactions;
+  
   res.json(products.map(p => {
     const pid = String(useCloudDB ? p._id : p.id);
-    const balance = transactions.filter(t => String(t.productId) === pid).reduce((s, t) => t.type === 'in' ? s + t.quantity : s - t.quantity, 0);
-    return { ...(useCloudDB ? p.toObject() : p), id: pid, balance };
+    const productTrans = transactions.filter(t => String(t.productId) === pid);
+    
+    // 计算库存余额
+    const balance = productTrans.reduce((s, t) => t.type === 'in' ? s + t.quantity : s - t.quantity, 0);
+    
+    // 获取最后一位经办人信息（无论是谁出库或入库）
+    const lastAction = productTrans[0]; // 因为上面 sorted by date: -1，所以第0个就是最新的
+    
+    return { 
+      ...(useCloudDB ? p.toObject() : p), 
+      id: pid, 
+      balance,
+      lastOperator: lastAction ? lastAction.username : (p.creatorName || '系统初始化'),
+      lastDate: lastAction ? lastAction.date : null
+    };
   }));
 });
 
@@ -228,7 +254,15 @@ app.get('/api/transactions', authenticate, async (req, res) => {
 });
 
 app.post('/api/transactions', authenticate, upload.single('transImage'), async (req, res) => {
-  const data = { ...req.body, quantity: parseInt(req.body.quantity), image: req.file ? (isProduction ? req.file.path : `/uploads/${req.file.filename}`) : '', userId: req.user.id, username: req.user.username, date: new Date() };
+  const data = { 
+    ...req.body, 
+    quantity: parseInt(req.body.quantity), 
+    customerName: req.body.customerName || '', // 显式确保接收客户名称
+    image: req.file ? (isProduction ? req.file.path : `/uploads/${req.file.filename}`) : '', 
+    userId: req.user.id, 
+    username: req.user.username, 
+    date: new Date() 
+  };
   if (useCloudDB) { const t = new Transaction(data); await t.save(); res.json({ ...t.toObject(), id: t._id }); }
   else { const db = getLocalData(); data.id = Date.now().toString(); db.transactions.push(data); saveLocalData(db); res.json(data); }
 });

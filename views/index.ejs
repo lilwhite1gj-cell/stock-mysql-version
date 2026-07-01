@@ -180,8 +180,8 @@
                                     <th class="w-[16%] p-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">参数 (品类/尺寸/材质)</th>
                                     <th class="w-[16%] p-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">维度 (客户/工厂)</th>
                                     <th class="w-[18%] p-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">计价/库存</th>
-                                    <th class="w-[10%] p-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">最后经办</th>
-                                    <th class="w-[24%] p-8 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">资产总额 (实时)</th>
+                                    <th class="w-[12%] p-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">最后变动经办</th>
+                                    <th class="w-[22%] p-8 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">资产总额 (实时)</th>
                                 </tr>
                             </thead>
                             <tbody id="invTable" class="divide-y divide-slate-50"></tbody>
@@ -197,21 +197,63 @@
                         <div class="flex flex-col items-end space-y-1">
                             <div class="flex items-center space-x-3">
                                 <button onclick="toggleDisplayCurrency()" class="currency-toggle-btn px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black text-indigo-600 shadow-sm active:scale-95 transition-all">显示币种: CNY</button>
-                                <button onclick="openModal('transModal')" class="bg-indigo-600 text-white px-8 py-4 rounded-[22px] shadow-2xl shadow-indigo-200 font-black flex items-center active:scale-95 transition-transform"><i data-lucide="plus-circle" class="w-5 h-5 mr-3"></i>立即记账</button>
+                                <div class="flex bg-white p-1.5 rounded-[22px] shadow-xl border border-indigo-50">
+                                    <button onclick="openTransModal('in')" class="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black text-xs flex items-center active:scale-95 transition-all hover:bg-emerald-700 shadow-lg shadow-emerald-200"><i data-lucide="download" class="w-4 h-4 mr-2"></i>产品入库</button>
+                                    <button onclick="openTransModal('out')" class="ml-1 bg-rose-600 text-white px-6 py-3 rounded-2xl font-black text-xs flex items-center active:scale-95 transition-all hover:bg-rose-700 shadow-lg shadow-rose-200"><i data-lucide="upload" class="w-4 h-4 mr-2"></i>产品出库</button>
+                                </div>
                             </div>
                             <span onclick="fetchExchangeRate()" class="rate-display cursor-pointer hover:text-indigo-600 transition-colors text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md tracking-widest text-center" title="点击手动刷新汇率">正在同步汇率...</span>
                         </div>
                     </div>
-                    <div class="flex items-center space-x-3 bg-white px-6 py-4 rounded-[22px] shadow-sm border border-slate-100 self-start">
-                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Order:</span>
-                        <select id="transSortField" onchange="renderTrans()" class="bg-transparent outline-none font-black text-sm text-indigo-600">
-                            <option value="dateDesc">日期: 最近优先</option>
-                            <option value="dateAsc">日期: 最早优先</option>
-                            <option value="qtyDesc">数量: 从大到小</option>
-                            <option value="valDesc">金额: 高价优先</option>
-                        </select>
+
+                    <!-- 增强型过滤器 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div class="flex items-center space-x-3 bg-white px-6 py-4 rounded-[22px] shadow-sm border border-slate-100">
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filter:</span>
+                            <select id="transFilterType" onchange="renderTrans()" class="bg-transparent outline-none font-black text-sm text-indigo-600 flex-1">
+                                <option value="all">全部历史明细</option>
+                                <option value="in">仅查看产品入库</option>
+                                <option value="out">仅查看发货出库</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center space-x-3 bg-white px-6 py-4 rounded-[22px] shadow-sm border border-slate-100">
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sort:</span>
+                            <select id="transSortField" onchange="renderTrans()" class="bg-transparent outline-none font-black text-sm text-indigo-600 flex-1">
+                                <option value="dateDesc">日期: 最近优先</option>
+                                <option value="dateAsc">日期: 最早优先</option>
+                                <option value="qtyDesc">数量: 从大到小</option>
+                                <option value="valDesc">金额: 高价优先</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center space-x-3 bg-white px-6 py-4 rounded-[22px] shadow-sm border border-slate-100 lg:col-span-1">
+                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Layout:</span>
+                            <select id="transLayoutMode" onchange="renderTrans()" class="bg-transparent outline-none font-black text-sm text-indigo-600 flex-1">
+                                <option value="single">单列时间线视图</option>
+                                <option value="double">双列分流对比 (入库|出库)</option>
+                            </select>
+                        </div>
                     </div>
+
+                    <!-- 单列容器 -->
                     <div id="transList" class="space-y-6"></div>
+                    
+                    <!-- 双列对比容器 -->
+                    <div id="transDoubleContainer" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between px-6 py-4 bg-emerald-50 rounded-3xl border border-emerald-100">
+                                <h4 class="text-emerald-700 font-black tracking-tighter">产品入库池 (IN)</h4>
+                                <span id="inCountTag" class="px-3 py-1 bg-emerald-600 text-white rounded-full text-[10px] font-black">0</span>
+                            </div>
+                            <div id="transInList" class="space-y-4"></div>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between px-6 py-4 bg-rose-50 rounded-3xl border border-rose-100">
+                                <h4 class="text-rose-700 font-black tracking-tighter">发货出库池 (OUT)</h4>
+                                <span id="outCountTag" class="px-3 py-1 bg-rose-600 text-white rounded-full text-[10px] font-black">0</span>
+                            </div>
+                            <div id="transOutList" class="space-y-4"></div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- 辅助档案 -->
@@ -320,9 +362,13 @@
     <div id="transModal" class="hidden fixed inset-0 z-[200] flex items-center justify-center p-0 md:p-6 bg-slate-900/70 backdrop-blur-md">
         <div class="bg-white w-full max-w-xl rounded-none md:rounded-[48px] p-8 md:p-12 shadow-2xl overflow-hidden flex flex-col h-full md:max-h-[90vh] modal-drawer">
             <div class="md:hidden modal-handle"></div>
-            <h3 class="text-3xl font-black mb-8 tracking-tighter text-center">业务流水记账</h3>
+            <h3 id="transModalTitle" class="text-3xl font-black mb-8 tracking-tighter text-center">业务流水记账</h3>
             <div class="space-y-5 modal-scroll detail-scroll-fix flex-1 pr-2">
-                <div class="p-5 bg-indigo-600 text-white rounded-[24px] flex items-center justify-between shadow-xl"><label class="font-black text-sm">这是一个新产品入库？</label><input type="checkbox" id="isNew" onchange="toggleQuickFields()" class="w-6 h-6 rounded-lg accent-white"></div>
+                <div id="inOnlyBox" class="p-5 bg-indigo-600 text-white rounded-[24px] flex items-center justify-between shadow-xl">
+                    <label class="font-black text-sm">这是一个新产品入库？</label>
+                    <input type="checkbox" id="isNew" onchange="toggleQuickFields()" class="w-6 h-6 rounded-lg accent-white">
+                </div>
+                <input type="hidden" id="tType">
                 <div id="oldPBox"><select id="tProd" class="w-full bg-slate-100 p-6 rounded-[24px] font-black border-0 outline-none"></select></div>
                 <div id="newPBox" class="hidden space-y-4 p-6 bg-slate-50 rounded-[32px] border border-indigo-100 shadow-inner">
                     <div class="grid grid-cols-2 gap-3"><select id="qCat" onchange="updateDynamicHints('q')" class="p-5 rounded-2xl bg-white border-0 font-black outline-none"></select><select id="qFact" class="p-5 rounded-2xl bg-white border-0 font-black outline-none"></select></div>
@@ -337,8 +383,11 @@
                         <input type="file" id="qImage" accept="image/*" class="text-xs mx-auto">
                     </div>
                 </div>
+                <div id="outOnlyBox" class="hidden">
+                    <input type="text" id="tCustomer" list="customerDataList" placeholder="收货客户名称 (选填)" class="w-full bg-slate-100 p-6 rounded-[24px] font-black border-0 outline-none" autocomplete="off">
+                </div>
                 <div class="grid grid-cols-2 gap-4"><input type="text" id="tOrder" placeholder="关联订单号" class="p-5 rounded-[22px] bg-slate-100 border-0 outline-none font-bold" autocomplete="off"><input type="text" id="tLog" placeholder="物流追踪号" class="p-5 rounded-[22px] bg-slate-100 border-0 outline-none font-bold" autocomplete="off"></div>
-                <div class="flex space-x-4"><select id="tType" class="flex-1 p-6 rounded-[24px] font-black bg-slate-900 text-white border-0 outline-none"><option value="in">产品入库 (+)</option><option value="out">出库发货 (-)</option></select><input type="number" id="tQty" placeholder="数量(包)" class="flex-1 p-6 rounded-[24px] font-black bg-slate-100 border-0 outline-none text-center" autocomplete="off"></div>
+                <div class="flex space-x-4"><div class="flex-1 p-6 rounded-[24px] font-black bg-slate-900 text-white flex items-center justify-center space-x-2"><i id="typeIcon"></i><span id="typeText"></span></div><input type="number" id="tQty" placeholder="数量(包)" class="flex-1 p-6 rounded-[24px] font-black bg-slate-100 border-0 outline-none text-center" autocomplete="off"></div>
                 <div class="p-6 bg-slate-100 rounded-[28px] border-2 border-dashed border-slate-200 text-center"><label class="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest">上传现场实拍照 (留档)</label><input type="file" id="tImage" accept="image/*" class="text-xs mx-auto"></div>
                 <textarea id="tNotes" placeholder="业务备注说明..." class="w-full bg-slate-100 p-6 rounded-[24px] h-24 border-0 font-bold outline-none" autocomplete="off"></textarea>
                 <button onclick="doSaveTrans()" id="btnSaveTrans" class="w-full bg-indigo-600 text-white py-6 rounded-[28px] font-black text-xl shadow-2xl active:scale-95 transition-all shadow-indigo-200">立即提交业务记录</button>
@@ -564,11 +613,8 @@
                 const res = await api.get('/inventory'); products = res.data; updateProductSelects();
                 const term = getEl('invSearch').value.toLowerCase(); const sortField = getEl('invSortField').value;
                 let filtered = products.filter(p => {
-                    const isAdmin = currentUser.role === 'admin' || currentUser.role === 'manager';
-                    const isSample = p.category && p.category.includes('样品');
-                    const isMine = p.createdBy === currentUser.id;
                     const matchesSearch = p.name.toLowerCase().includes(term) || p.sku.toLowerCase().includes(term);
-                    return matchesSearch && (isAdmin || isSample || isMine);
+                    return matchesSearch; // 移除权限过滤，全员可见
                 });
                 filtered.sort((a, b) => { let vA = a[sortField], vB = b[sortField]; if (sortField === 'value') { vA = a.balance * a.unitPrice; vB = b.balance * b.unitPrice; } return (typeof vA === 'string') ? vA.localeCompare(vB) : vB - vA; });
                 
@@ -600,7 +646,12 @@
                         <td class="p-8 text-center"><div class="flex flex-col items-center">${catTag}${specTag}${matTag}</div></td>
                         <td class="p-8 text-center"><div class="flex flex-col items-center">${custTag}${factTag}</div></td>
                         <td class="p-8 text-center"><div class="space-y-1"><div class="text-sm font-bold text-slate-400 uppercase tracking-tighter">${formatMoney(p.unitPrice, p.currency)} <span class="opacity-30">(${p.currency})</span></div><div class="text-2xl md:text-3xl font-black text-slate-900 tracking-tighter">${p.balance} <span class="text-[10px] uppercase opacity-30 font-bold">Bags</span></div></div></td>
-                        <td class="p-8 text-center text-xs font-black text-slate-400 uppercase tracking-widest">${p.creatorName||'SYSTEM'}</td>
+                        <td class="p-8 text-center">
+                            <div class="space-y-1">
+                                <div class="text-xs font-black text-indigo-600 uppercase tracking-widest">${p.lastOperator}</div>
+                                <div class="text-[9px] text-slate-300 font-bold">${p.lastDate ? new Date(p.lastDate).toLocaleDateString() : '尚未出入库'}</div>
+                            </div>
+                        </td>
                         <td class="p-8 text-right font-black text-lg xl:text-2xl text-emerald-600 tracking-tighter tabular-nums whitespace-nowrap overflow-hidden text-ellipsis">${formatMoney(p.balance * p.unitPrice, p.currency)}</td>
                     </tr>`;
                 }).join('');
@@ -654,59 +705,75 @@
             try {
                 const res = await api.get('/transactions'); 
                 let data = res.data;
+                const filterType = getEl('transFilterType').value;
                 const sortType = getEl('transSortField').value;
+                const layoutMode = getEl('transLayoutMode').value;
                 
-                if (sortType === 'dateDesc') {
-                    data.sort((a, b) => new Date(b.date) - new Date(a.date));
-                } else if (sortType === 'dateAsc') {
-                    data.sort((a, b) => new Date(a.date) - new Date(b.date));
-                } else if (sortType === 'qtyDesc') {
-                    data.sort((a, b) => b.quantity - a.quantity);
-                } else if (sortType === 'valDesc') {
-                    data.sort((a, b) => {
-                        const pA = products.find(x => x.id === a.productId);
-                        const pB = products.find(x => x.id === b.productId);
-                        const valA = a.quantity * (pA?.unitPrice || 0);
-                        const valB = b.quantity * (pB?.unitPrice || 0);
-                        return valB - valA;
-                    });
+                // 1. 过滤逻辑
+                if (filterType !== 'all') {
+                    data = data.filter(t => t.type === filterType);
                 }
 
-                getEl('transList').innerHTML = data.map(t => {
+                // 2. 排序逻辑
+                const sortFn = (a, b) => {
+                    if (sortType === 'dateDesc') return new Date(b.date) - new Date(a.date);
+                    if (sortType === 'dateAsc') return new Date(a.date) - new Date(b.date);
+                    if (sortType === 'qtyDesc') return b.quantity - a.quantity;
+                    if (sortType === 'valDesc') {
+                        const pA = products.find(x => x.id === a.productId), pB = products.find(x => x.id === b.productId);
+                        return (b.quantity * (pB?.unitPrice || 0)) - (a.quantity * (pA?.unitPrice || 0));
+                    }
+                    return 0;
+                };
+                data.sort(sortFn);
+
+                // 辅助：生成卡片 HTML 的内部函数
+                const createCardHtml = (t) => {
                     const p = products.find(x => x.id === t.productId), isIn = t.type === 'in';
                     const isAdmin = currentUser.role === 'admin' || currentUser.role === 'manager';
-                    const imgPreview = t.image ? `<img src="${t.image}" class="w-16 h-16 md:w-28 md:h-28 rounded-2xl object-cover shadow-lg border-2 md:border-4 border-white cursor-zoom-in hover:scale-105 transition-transform flex-shrink-0" onclick="event.stopPropagation(); previewImg('${t.image}')">` : `<div class="w-16 h-16 md:w-28 md:h-28 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-300 border-2 border-dashed border-slate-200 flex-shrink-0"><i data-lucide="image" class="w-8 h-8"></i></div>`;
-                    const delBtn = isAdmin ? `<button onclick="event.stopPropagation(); doDeleteTrans('${t.id}')" class="p-3 bg-rose-50 text-rose-400 rounded-xl active:scale-90 transition-all hover:bg-rose-100"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : '';
+                    const customerTag = t.customerName ? `<span class="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md text-[9px] font-black border border-indigo-100/50 mr-2">${isIn?'来源':'去向'}: ${t.customerName}</span>` : '';
+                    const imgPreview = t.image ? `<img src="${t.image}" class="w-16 h-16 md:w-20 md:h-20 rounded-2xl object-cover shadow-lg border-2 border-white cursor-zoom-in flex-shrink-0" onclick="event.stopPropagation(); previewImg('${t.image}')">` : `<div class="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-300 border-2 border-dashed border-slate-200 flex-shrink-0"><i data-lucide="image" class="w-6 h-6"></i></div>`;
+                    const delBtn = isAdmin ? `<button onclick="event.stopPropagation(); doDeleteTrans('${t.id}')" class="p-2.5 bg-rose-50 text-rose-400 rounded-xl active:scale-90 transition-all hover:bg-rose-100"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : '';
                     
                     return `
-                    <div class="glass-card p-5 md:p-8 border-l-[8px] md:border-l-[12px] ${isIn ? 'border-emerald-500' : 'border-rose-500'} flex flex-row items-center gap-4 md:gap-6 animate-in slide-in-from-bottom-4 shadow-sm hover:shadow-md transition-all clickable-row" onclick="showTransDetail('${t.id}')">
-                        <!-- 图片 -->
+                    <div class="glass-card p-4 md:p-6 border-l-[6px] md:border-l-[10px] ${isIn ? 'border-emerald-500' : 'border-rose-500'} flex flex-row items-center gap-4 animate-in slide-in-from-bottom-2 shadow-sm hover:shadow-md transition-all clickable-row" onclick="showTransDetail('${t.id}')">
                         ${imgPreview}
-                        
-                        <!-- 信息区 -->
                         <div class="flex-1 min-w-0">
-                            <div class="flex items-center space-x-2 mb-1 md:mb-2">
-                                <span class="px-2 py-0.5 rounded-full text-[8px] md:text-[10px] font-black uppercase tracking-widest ${isIn ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">${isIn ? '入库' : '出库'}</span>
-                                <span class="text-[8px] md:text-[10px] font-black text-slate-300 tracking-wider md:tracking-[0.2em] uppercase">${new Date(t.date).toLocaleString([], {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'})}</span>
+                            <div class="flex items-center space-x-2 mb-1">
+                                <span class="text-[8px] font-black text-slate-300 tracking-widest uppercase">${new Date(t.date).toLocaleDateString()}</span>
+                                ${customerTag}
                             </div>
-                            <h4 class="text-base md:text-2xl font-black truncate text-slate-800 tracking-tighter mb-1 md:mb-2">${p ? p.name : '已删'}</h4>
-                            ${t.notes ? `<div class="text-[10px] md:text-xs text-slate-500 italic bg-slate-100/50 p-2 rounded-lg border-l-2 border-slate-300 mb-2 mt-1">📝 ${t.notes}</div>` : ''}
-                            <div class="flex flex-wrap gap-1.5 md:gap-3 items-center">
-                                <span class="text-[9px] md:text-xs font-black text-slate-400">${t.username}</span>
-                                <span class="text-[9px] md:font-mono text-slate-300 truncate max-w-[80px] md:max-w-none">${t.orderNo || ''}</span>
+                            <h4 class="text-sm md:text-lg font-black truncate text-slate-800 tracking-tighter">${p ? p.name : '已删'}</h4>
+                            <div class="flex items-center justify-between mt-2">
+                                <div class="text-xs font-black text-slate-900">${formatMoney(t.quantity * (p?.unitPrice || 0), p?.currency)}</div>
+                                <div class="text-[10px] font-black ${isIn ? 'text-emerald-600' : 'text-rose-600'}">${isIn ? '+' : '-'}${t.quantity} Bags</div>
                             </div>
-                        </div>
-
-                        <!-- 数值区 -->
-                        <div class="text-right flex-shrink-0">
-                            <p class="text-xl md:text-4xl font-black text-slate-900 tracking-tighter mb-1 break-all">${formatMoney(t.quantity * (p?.unitPrice || 0), p?.currency)}</p>
-                            <p class="text-[10px] md:text-sm font-black ${isIn ? 'text-emerald-600' : 'text-rose-600'} uppercase tracking-widest">${isIn ? '+' : '-'}${t.quantity} Bags</p>
                         </div>
                         ${delBtn}
                     </div>`;
-                }).join('');
+                };
+
+                // 3. 布局逻辑
+                if (layoutMode === 'double') {
+                    getEl('transList').classList.add('hidden');
+                    getEl('transDoubleContainer').classList.remove('hidden');
+                    
+                    const inData = data.filter(x => x.type === 'in');
+                    const outData = data.filter(x => x.type === 'out');
+                    
+                    getEl('inCountTag').innerText = inData.length;
+                    getEl('outCountTag').innerText = outData.length;
+                    
+                    getEl('transInList').innerHTML = inData.length ? inData.map(createCardHtml).join('') : '<p class="text-center text-[10px] text-slate-300 py-10 font-bold uppercase tracking-widest">暂无入库数据</p>';
+                    getEl('transOutList').innerHTML = outData.length ? outData.map(createCardHtml).join('') : '<p class="text-center text-[10px] text-slate-300 py-10 font-bold uppercase tracking-widest">暂无出库数据</p>';
+                } else {
+                    getEl('transList').classList.remove('hidden');
+                    getEl('transDoubleContainer').classList.add('hidden');
+                    getEl('transList').innerHTML = data.length ? data.map(createCardHtml).join('') : '<div class="glass-card p-20 text-center space-y-4"><div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-200"><i data-lucide="archive" class="w-8 h-8"></i></div><p class="text-slate-400 font-black tracking-widest text-sm uppercase">所选范围内无业务记录</p></div>';
+                }
+
                 lucide.createIcons();
-            } catch (e) {}
+            } catch (e) { console.error('Render Trans Error:', e); }
         }
 
         function updateDynamicHints(prefix) {
@@ -829,9 +896,55 @@
             });
         }
 
+        function openTransModal(type) {
+            resetTransModal();
+            getEl('tType').value = type;
+            const isIn = type === 'in';
+            
+            // UI 动态调整
+            getEl('transModalTitle').innerText = isIn ? '产品入库记账' : '产品发货出库';
+            getEl('inOnlyBox').classList.toggle('hidden', !isIn);
+            getEl('outOnlyBox').classList.toggle('hidden', isIn);
+            
+            // 按钮颜色与文字
+            const btn = getEl('btnSaveTrans');
+            btn.className = `w-full ${isIn?'bg-emerald-600 shadow-emerald-200':'bg-rose-600 shadow-rose-200'} text-white py-6 rounded-[28px] font-black text-xl shadow-2xl active:scale-95 transition-all`;
+            
+            // 状态标签
+            getEl('typeText').innerText = isIn ? '产品入库 (+)' : '发货出库 (-)';
+            getEl('typeIcon').innerHTML = `<i data-lucide="${isIn?'download':'upload'}" class="w-4 h-4"></i>`;
+            
+            lucide.createIcons();
+            openModal('transModal');
+        }
+
+        function openTransModal(type) {
+            resetTransModal();
+            getEl('tType').value = type;
+            const isIn = type === 'in';
+            
+            // UI 动态调整
+            getEl('transModalTitle').innerText = isIn ? '产品入库记账' : '产品发货出库';
+            getEl('inOnlyBox').classList.toggle('hidden', !isIn);
+            getEl('outOnlyBox').classList.toggle('hidden', isIn);
+            
+            // 按钮颜色与文字
+            const btn = getEl('btnSaveTrans');
+            btn.className = `w-full ${isIn?'bg-emerald-600 shadow-emerald-200':'bg-rose-600 shadow-rose-200'} text-white py-6 rounded-[28px] font-black text-xl shadow-2xl active:scale-95 transition-all`;
+            
+            // 状态标签
+            getEl('typeText').innerText = isIn ? '产品入库 (+)' : '发货出库 (-)';
+            const iconHtml = isIn ? '<i data-lucide="download" class="w-5 h-5"></i>' : '<i data-lucide="upload" class="w-5 h-5"></i>';
+            getEl('typeIcon').innerHTML = iconHtml;
+            
+            lucide.createIcons();
+            openModal('transModal');
+        }
+
         async function doSaveTrans() {
             const btn = getEl('btnSaveTrans'); if(btn.disabled) return;
-            const isN = getEl('isNew').checked;
+            const type = getEl('tType').value;
+            const isN = getEl('isNew').checked && type === 'in';
             getEl('globalLoading').classList.remove('hidden');
             try {
                 btn.disabled = true; 
@@ -853,16 +966,66 @@
                 }
                 if(!pid && !isN) {
                     getEl('globalLoading').classList.add('hidden');
-                    return toast('⚠️ 请选择或录入产品', 'bg-amber-500');
+                    return toast('⚠️ 请选择产品', 'bg-amber-500');
+                }
+                
+                // 如果是出库且填写了客户，自动建立/关联客户关系
+                if(type === 'out' && getEl('tCustomer').value) {
+                    await getOrCreateCustomer(getEl('tCustomer').value);
                 }
                 
                 btn.innerText = '正在保存流水记录...';
                 const tfd = new FormData(); 
                 tfd.append('productId', pid); 
-                tfd.append('type', getEl('tType').value); 
+                tfd.append('type', type); 
                 tfd.append('quantity', getEl('tQty').value); 
                 tfd.append('orderNo', getEl('tOrder').value); 
                 tfd.append('logisticsNo', getEl('tLog').value); 
+                tfd.append('customerName', (type === 'out' && getEl('tCustomer').value) ? getEl('tCustomer').value : '');
+                tfd.append('notes', getEl('tNotes').value);
+                if(getEl('tImage').files[0]) {
+                    const compressed = await compressImage(getEl('tImage').files[0]);
+                    tfd.append('transImage', compressed, 'compressed.jpg');
+                }
+                await api.post('/transactions', tfd); 
+                
+                const finalInv = await api.get('/inventory');
+                products = finalInv.data;
+                resetTransModal(); 
+                closeModal('transModal'); 
+                renderTrans(); 
+                renderInventory(); 
+                toast('✅ 业务已成功同步', 'bg-emerald-600');
+            } catch (e) { 
+                console.error('Save Transaction Error:', e);
+                toast('❌ 提交失败：请检查网络或必填项', 'bg-red-600'); 
+            } finally { 
+                btn.disabled = false; 
+                btn.innerText = '立即提交业务记录';
+                getEl('globalLoading').classList.add('hidden');
+            }
+        }
+                    const r = await api.post('/products', fd); 
+                    pid = r.data.id;
+                }
+                if(!pid && !isN) {
+                    getEl('globalLoading').classList.add('hidden');
+                    return toast('⚠️ 请选择产品', 'bg-amber-500');
+                }
+                
+                // 如果是出库且填写了客户，自动建立/关联客户关系
+                if(type === 'out' && getEl('tCustomer').value) {
+                    await getOrCreateCustomer(getEl('tCustomer').value);
+                }
+                
+                btn.innerText = '正在保存流水记录...';
+                const tfd = new FormData(); 
+                tfd.append('productId', pid); 
+                tfd.append('type', type); 
+                tfd.append('quantity', getEl('tQty').value); 
+                tfd.append('orderNo', getEl('tOrder').value); 
+                tfd.append('logisticsNo', getEl('tLog').value); 
+                tfd.append('customerName', (type === 'out' && getEl('tCustomer').value) ? getEl('tCustomer').value : '');
                 tfd.append('notes', getEl('tNotes').value);
                 if(getEl('tImage').files[0]) {
                     const compressed = await compressImage(getEl('tImage').files[0]);
