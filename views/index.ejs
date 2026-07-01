@@ -912,10 +912,76 @@
             
             // 状态标签
             getEl('typeText').innerText = isIn ? '产品入库 (+)' : '发货出库 (-)';
-            getEl('typeIcon').innerHTML = `<i data-lucide="${isIn?'download':'upload'}" class="w-4 h-4"></i>`;
+            const iconHtml = isIn ? '<i data-lucide="download" class="w-5 h-5"></i>' : '<i data-lucide="upload" class="w-5 h-5"></i>';
+            getEl('typeIcon').innerHTML = iconHtml;
             
             lucide.createIcons();
             openModal('transModal');
+        }
+
+        async function doSaveTrans() {
+            const btn = getEl('btnSaveTrans'); if(btn.disabled) return;
+            const type = getEl('tType').value;
+            const isN = getEl('isNew').checked && type === 'in';
+            getEl('globalLoading').classList.remove('hidden');
+            try {
+                btn.disabled = true; 
+                btn.innerText = '正在同步数据...';
+                let pid = getEl('tProd').value;
+                if(isN) {
+                    btn.innerText = '正在建立新产品档案...';
+                    const cust = await getOrCreateCustomer(getEl('qCust').value, getEl('qCustAddr').value, getEl('qCustPhone').value);
+                    const fd = new FormData();
+                    const qMap = { name:'qName', category:'qCat', unitPrice:'qPrice', currency:'qCurr', factoryId:'qFact', packaging:'qPack', sku:'qSku', spec:'qSpec', material:'qMat' };
+                    for(let k in qMap) { fd.append(k, getEl(qMap[k]).value); }
+                    fd.append('customerName', cust?.name || '通用'); 
+                    if(getEl('qImage').files[0]) {
+                        const compressed = await compressImage(getEl('qImage').files[0]);
+                        fd.append('image', compressed, 'compressed.jpg');
+                    }
+                    const r = await api.post('/products', fd); 
+                    pid = r.data.id;
+                }
+                if(!pid && !isN) {
+                    getEl('globalLoading').classList.add('hidden');
+                    return toast('⚠️ 请选择产品', 'bg-amber-500');
+                }
+                
+                // 如果是出库且填写了客户，自动建立/关联客户关系
+                if(type === 'out' && getEl('tCustomer').value) {
+                    await getOrCreateCustomer(getEl('tCustomer').value);
+                }
+                
+                btn.innerText = '正在保存流水记录...';
+                const tfd = new FormData(); 
+                tfd.append('productId', pid); 
+                tfd.append('type', type); 
+                tfd.append('quantity', getEl('tQty').value); 
+                tfd.append('orderNo', getEl('tOrder').value); 
+                tfd.append('logisticsNo', getEl('tLog').value); 
+                tfd.append('customerName', (type === 'out' && getEl('tCustomer').value) ? getEl('tCustomer').value : '');
+                tfd.append('notes', getEl('tNotes').value);
+                if(getEl('tImage').files[0]) {
+                    const compressed = await compressImage(getEl('tImage').files[0]);
+                    tfd.append('transImage', compressed, 'compressed.jpg');
+                }
+                await api.post('/transactions', tfd); 
+                
+                const finalInv = await api.get('/inventory');
+                products = finalInv.data;
+                resetTransModal(); 
+                closeModal('transModal'); 
+                renderTrans(); 
+                renderInventory(); 
+                toast('✅ 业务已成功同步', 'bg-emerald-600');
+            } catch (e) { 
+                console.error('Save Transaction Error:', e);
+                toast('❌ 提交失败：请检查网络或必填项', 'bg-red-600'); 
+            } finally { 
+                btn.disabled = false; 
+                btn.innerText = '立即提交业务记录';
+                getEl('globalLoading').classList.add('hidden');
+            }
         }
 
         async function doSaveTrans() {
