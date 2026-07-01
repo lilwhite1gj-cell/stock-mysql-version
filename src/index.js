@@ -91,6 +91,7 @@ const Transaction = mongoose.model('Transaction', new mongoose.Schema({ productI
 const Customer = mongoose.model('Customer', new mongoose.Schema({ name: String, address: String, phone: String, createdBy: String }));
 const Factory = mongoose.model('Factory', new mongoose.Schema({ name: String, address: String, color: String }));
 const Category = mongoose.model('Category', new mongoose.Schema({ name: String }));
+const Config = mongoose.model('Config', new mongoose.Schema({ key: String, value: mongoose.Schema.Types.Mixed }));
 
 // --- Cloudinary ---
 cloudinary.config({ cloud_name: process.env.CLOUDINARY_NAME, api_key: process.env.CLOUDINARY_KEY, api_secret: process.env.CLOUDINARY_SECRET });
@@ -383,7 +384,40 @@ app.get('/api/dashboard-stats', authenticate, async (req, res) => {
 
   res.json({ performance, leaderboard, productMix });
 });
-app.get('/api/exchange-rate', async (req, res) => res.json({ rate: 7.25, lastUpdate: Date.now() }));
+app.get('/api/exchange-rate', async (req, res) => { 
+  try {
+    // 1. 尝试从数据库获取缓存
+    let cache = useCloudDB ? await Config.findOne({ key: 'exchange_rate' }) : null;
+    const now = Date.now();
+
+    // 2. 如果缓存存在且未超过 12 小时，直接返回
+    if (cache && (now - new Date(cache.value.lastUpdate).getTime() < 12 * 60 * 60 * 1000)) {
+      return res.json(cache.value);
+    }
+
+    // 3. 否则，尝试从公网抓取最新数据 (使用 Node 原生 fetch)
+    const resp = await fetch('https://open.er-api.com/v6/latest/USD');
+    const data = await resp.json();
+    const newRate = parseFloat(data.rates.CNY.toFixed(2));
+    
+    const result = { rate: newRate, lastUpdate: now, source: 'Real-time' };
+
+    // 4. 更新数据库缓存
+    if (useCloudDB) {
+      await Config.findOneAndUpdate({ key: 'exchange_rate' }, { value: result }, { upsert: true });
+    }
+
+    res.json(result);
+  } catch (e) {
+    // 5. 极端情况：公网抓取失败，尝试返回数据库里最后一次存的“真汇率”
+    let lastKnown = useCloudDB ? await Config.findOne({ key: 'exchange_rate' }) : null;
+    if (lastKnown) {
+      res.json({ ...lastKnown.value, source: 'Database Cache' });
+    } else {
+      res.json({ rate: 6.78, lastUpdate: Date.now(), source: 'Hardcoded Fallback' }); 
+    }
+  }
+});
 app.get('/api/factories', authenticate, async (req, res) => res.json((useCloudDB ? await Factory.find() : getLocalData().factories).map(x => ({ ... (useCloudDB ? x.toObject() : x), id: useCloudDB ? x._id : x.id }))));
 app.get('/api/customers', authenticate, async (req, res) => res.json((useCloudDB ? await Customer.find() : getLocalData().customers).map(x => ({ ... (useCloudDB ? x.toObject() : x), id: useCloudDB ? x._id : x.id }))));
 
