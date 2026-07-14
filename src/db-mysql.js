@@ -15,7 +15,10 @@ export async function getPool() {
     waitForConnections: true,
     connectionLimit: 10,
     charset: 'utf8mb4',
-    ssl: process.env.MYSQL_SSL === 'true' ? { rejectUnauthorized: false } : undefined
+    ssl: process.env.MYSQL_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000,
+    connectTimeout: 15000
   });
   return pool;
 }
@@ -144,11 +147,33 @@ export async function initDatabase() {
 
 // ============ 通用 CRUD 助手 ============
 
+// 瞬态错误重试（ECONNRESET/EPIPE/PROTOCOL_CONNECTION_LOST等）
+const TRANSIENT_ERRORS = ['ECONNRESET', 'EPIPE', 'PROTOCOL_CONNECTION_LOST', 'PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR'];
+async function retryOnTransient(fn, retries = 2) {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const isTransient = TRANSIENT_ERRORS.some(e => err.code === e || (err.message && err.message.includes(e)));
+      if (isTransient && i < retries) {
+        console.log(`⚠️ MySQL瞬态错误(${err.code})，重试 ${i + 1}/${retries}...`);
+        // 重置连接池，强制下次获取新连接
+        pool = null;
+        await new Promise(r => setTimeout(r, 500 * (i + 1)));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
 // 查询并返回数组（自动将 snake_case 转为 camelCase）
 export async function queryRows(sql, params = []) {
-  const db = await getPool();
-  const [rows] = await db.query(sql, params);
-  return rows.map(row => toCamelCase(row));
+  return retryOnTransient(async () => {
+    const db = await getPool();
+    const [rows] = await db.query(sql, params);
+    return rows.map(row => toCamelCase(row));
+  });
 }
 
 // 查询并返回单行
@@ -159,9 +184,11 @@ export async function queryRow(sql, params = []) {
 
 // 执行写操作
 export async function execute(sql, params = []) {
-  const db = await getPool();
-  const [result] = await db.execute(sql, params);
-  return result;
+  return retryOnTransient(async () => {
+    const db = await getPool();
+    const [result] = await db.execute(sql, params);
+    return result;
+  });
 }
 
 // snake_case → camelCase 转换

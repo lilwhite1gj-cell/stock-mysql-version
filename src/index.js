@@ -49,23 +49,21 @@ const getLocalData = () => {
 const saveLocalData = (data) => { fs.writeFileSync(dbPath, JSON.stringify(data, null, 2)); };
 
 // --- MySQL 数据库连接 (MySQL优先，JSON备选) ---
-if (process.env.MYSQL_HOST) {
-  initDatabase()
-    .then(() => {
-      useMySQL = true;
-      mysqlReady = true;
-      console.log('✅ DATABASE: MySQL');
-    })
-    .catch((err) => {
-      useMySQL = false;
-      mysqlReady = false;
-      console.log('⚠️ DATABASE: MySQL连接失败，回退到本地JSON存储');
-      console.log('⚠️ MySQL连接报错详情:', err.message);
-      console.log('💡 提示: 数据将保存到本地data/db.json，MySQL可用后需重新导入');
-    });
-} else {
-  console.log('ℹ️ 未配置MYSQL_HOST，使用本地JSON存储');
-}
+const mysqlInitPromise = process.env.MYSQL_HOST
+  ? initDatabase()
+      .then(() => {
+        useMySQL = true;
+        mysqlReady = true;
+        console.log('✅ DATABASE: MySQL');
+      })
+      .catch((err) => {
+        useMySQL = false;
+        mysqlReady = false;
+        console.log('⚠️ DATABASE: MySQL连接失败，回退到本地JSON存储');
+        console.log('⚠️ MySQL连接报错详情:', err.message);
+        console.log('💡 提示: 数据将保存到本地data/db.json，MySQL可用后需重新导入');
+      })
+  : Promise.resolve().then(() => console.log('ℹ️ 未配置MYSQL_HOST，使用本地JSON存储'));
 
 // --- Cloudinary ---
 cloudinary.config({ cloud_name: process.env.CLOUDINARY_NAME, api_key: process.env.CLOUDINARY_KEY, api_secret: process.env.CLOUDINARY_SECRET });
@@ -765,7 +763,9 @@ app.post('/api/backup/import', authenticate, async (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 import os from 'os';
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
+  // 等待MySQL初始化完成，避免竞态条件导致启动消息显示错误
+  await mysqlInitPromise;
   const localIP = Object.values(os.networkInterfaces()).flat().find(i => i.family === 'IPv4' && !i.internal)?.address || 'localhost';
   const dbMode = useMySQL ? 'MySQL' : (process.env.MYSQL_HOST ? 'Local JSON (MySQL不可用)' : 'Local JSON');
   console.log(`🚀 Server on http://localhost:${PORT} | Mode: ${dbMode}`);
