@@ -303,25 +303,8 @@ app.post('/api/transactions', authenticate, upload.single('transImage'), async (
   if (isNaN(quantity) || quantity <= 0) return res.status(400).json({ message: '数量必须为正整数' });
   if (!req.body.type || !['in', 'out'].includes(req.body.type)) return res.status(400).json({ message: '类型无效' });
   
-  // 出库数量校验：检查库存是否充足
-  if (req.body.type === 'out') {
-    let balance;
-    if (useMySQL) {
-      const [inRows] = await (await getPool()).query('SELECT COALESCE(SUM(quantity),0) as total FROM transactions WHERE product_id = ? AND type = ?', [req.body.productId, 'in']);
-      const [outRows] = await (await getPool()).query('SELECT COALESCE(SUM(quantity),0) as total FROM transactions WHERE product_id = ? AND type = ?', [req.body.productId, 'out']);
-      balance = inRows[0].total - outRows[0].total;
-    } else {
-      const db = getLocalData();
-      const pid = req.body.productId;
-      balance = db.transactions.filter(t => t.productId === pid && t.type === 'in').reduce((s, t) => s + t.quantity, 0)
-               - db.transactions.filter(t => t.productId === pid && t.type === 'out').reduce((s, t) => s + t.quantity, 0);
-    }
-    if (quantity > balance) return res.status(400).json({ message: `库存不足！当前库存 ${balance}，出库数量 ${quantity} 超出可用库存` });
-  }
-  
   const id = Date.now().toString();
   const image = req.file ? (isProduction ? req.file.path : `/uploads/${req.file.filename}`) : '';
-  // 入库自动生成批次号
   const batchNo = req.body.type === 'in' ? (req.body.batchNo || `BN-${Date.now().toString(36).toUpperCase()}`) : (req.body.batchNo || '');
   const data = { 
     id, productId: req.body.productId, type: req.body.type, quantity,
@@ -330,7 +313,51 @@ app.post('/api/transactions', authenticate, upload.single('transImage'), async (
     batchNo, notes: req.body.notes || '',
     image, userId: req.user.id, username: req.user.username, date: new Date()
   };
+
+  // ===== 出库核心校验：事务+行锁，绝对禁止负库存 =====
+  if (req.body.type === 'out') {
+    if (useMySQL) {
+      // MySQL模式：事务 + FOR UPDATE 行锁，防止并发竞态
+      const conn = await (await getPool()).getConnection();
+      try {
+        await conn.beginTransaction();
+        // 原子查询：单条SQL计算余额，加FOR UPDATE锁住该产品的所有流水行
+        const [rows] = await conn.query(
+          'SELECT COALESCE(SUM(CASE WHEN type = ? THEN quantity ELSE 0 END), 0) - COALESCE(SUM(CASE WHEN type = ? THEN quantity ELSE 0 END), 0) AS balance FROM transactions WHERE product_id = ? FOR UPDATE',
+          ['in', 'out', req.body.productId]
+        );
+        const balance = rows[0].balance;
+        if (quantity > balance) {
+          await conn.rollback();
+          return res.status(400).json({ message: `库存不足！当前库存 ${balance}，出库数量 ${quantity} 超出可用库存` });
+        }
+        await conn.execute(
+          'INSERT INTO transactions (id, product_id, type, quantity, order_no, logistics_no, customer_name, receiver, batch_no, notes, image, user_id, username, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [data.id, data.productId, data.type, data.quantity, data.orderNo, data.logisticsNo, data.customerName, data.receiver, data.batchNo, data.notes, data.image, data.userId, data.username, data.date]
+        );
+        await conn.commit();
+        return res.json(data);
+      } catch (e) {
+        await conn.rollback();
+        return res.status(500).json({ message: '出库操作失败：' + e.message });
+      } finally {
+        conn.release();
+      }
+    } else {
+      // JSON模式：同步校验+写入（单进程无并发问题）
+      const db = getLocalData();
+      const pid = req.body.productId;
+      const balance = db.transactions.filter(t => t.productId === pid && t.type === 'in').reduce((s, t) => s + t.quantity, 0)
+                   - db.transactions.filter(t => t.productId === pid && t.type === 'out').reduce((s, t) => s + t.quantity, 0);
+      if (quantity > balance) {
+        return res.status(400).json({ message: `库存不足！当前库存 ${balance}，出库数量 ${quantity} 超出可用库存` });
+      }
+      db.transactions.push(data); saveLocalData(db);
+      return res.json(data);
+    }
+  }
   
+  // ===== 入库：无需余额校验 =====
   if (useMySQL) {
     await execute(
       'INSERT INTO transactions (id, product_id, type, quantity, order_no, logistics_no, customer_name, receiver, batch_no, notes, image, user_id, username, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -343,14 +370,56 @@ app.post('/api/transactions', authenticate, upload.single('transImage'), async (
 });
 
 app.delete('/api/transactions/:id', authenticate, async (req, res) => {
+  // ===== 删除流水前校验：防止产生负库存 =====
   if (useMySQL) {
-    await execute('DELETE FROM transactions WHERE id = ?', [req.params.id]);
+    const conn = await (await getPool()).getConnection();
+    try {
+      await conn.beginTransaction();
+      // 先查要删除的记录
+      const [rows] = await conn.query('SELECT product_id, type, quantity FROM transactions WHERE id = ?', [req.params.id]);
+      if (rows.length === 0) { await conn.rollback(); return res.status(404).json({ message: '记录不存在' }); }
+      const { product_id: pid, type, quantity } = rows[0];
+      // 如果是入库记录，删除后需检查是否会导致库存变负
+      if (type === 'in') {
+        const [balRows] = await conn.query(
+          'SELECT COALESCE(SUM(CASE WHEN type = ? THEN quantity ELSE 0 END), 0) - COALESCE(SUM(CASE WHEN type = ? THEN quantity ELSE 0 END), 0) AS balance FROM transactions WHERE product_id = ? FOR UPDATE',
+          ['in', 'out', pid]
+        );
+        const currentBalance = balRows[0].balance;
+        // 删除此入库记录后的新余额 = 当前余额 - 入库数量
+        const newBalance = currentBalance - quantity;
+        if (newBalance < 0) {
+          await conn.rollback();
+          return res.status(400).json({ message: `无法删除该入库记录！删除后库存将变为 ${newBalance}（负值），当前库存 ${currentBalance}，该入库数量 ${quantity}` });
+        }
+      }
+      await conn.execute('DELETE FROM transactions WHERE id = ?', [req.params.id]);
+      await conn.commit();
+      res.json({ message: 'Success' });
+    } catch (e) {
+      await conn.rollback();
+      res.status(500).json({ message: '删除失败：' + e.message });
+    } finally {
+      conn.release();
+    }
   } else {
     const db = getLocalData();
+    const trans = db.transactions.find(t => t.id === req.params.id);
+    if (!trans) return res.status(404).json({ message: '记录不存在' });
+    // 如果是入库记录，检查删除后是否负库存
+    if (trans.type === 'in') {
+      const pid = trans.productId;
+      const currentBalance = db.transactions.filter(t => t.productId === pid && t.type === 'in').reduce((s, t) => s + t.quantity, 0)
+                            - db.transactions.filter(t => t.productId === pid && t.type === 'out').reduce((s, t) => s + t.quantity, 0);
+      const newBalance = currentBalance - trans.quantity;
+      if (newBalance < 0) {
+        return res.status(400).json({ message: `无法删除该入库记录！删除后库存将变为 ${newBalance}（负值），当前库存 ${currentBalance}，该入库数量 ${trans.quantity}` });
+      }
+    }
     db.transactions = db.transactions.filter(t => t.id !== req.params.id);
     saveLocalData(db);
+    res.json({ message: 'Success' });
   }
-  res.json({ message: 'Success' });
 });
 
 app.get('/api/admin/users', authenticate, async (req, res) => {

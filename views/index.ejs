@@ -632,6 +632,14 @@
                     </div>
                 </div>
                 <div id="outOnlyBox" class="hidden">
+                    <div id="stockHint" class="hidden p-4 bg-amber-50 border border-amber-200 rounded-2xl mb-4 flex items-center space-x-3">
+                        <i data-lucide="package" class="w-5 h-5 text-amber-500 flex-shrink-0"></i>
+                        <div><p class="text-xs font-black text-amber-700">当前可用库存</p><p id="stockHintValue" class="text-xl font-black text-amber-600">0 包</p></div>
+                    </div>
+                    <div id="stockWarning" class="hidden p-4 bg-rose-50 border border-rose-200 rounded-2xl mb-4 flex items-center space-x-3">
+                        <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-500 flex-shrink-0"></i>
+                        <p id="stockWarningText" class="text-xs font-black text-rose-600"></p>
+                    </div>
                     <input type="text" id="tReceiver" placeholder="领用人姓名 (谁领走的)" class="w-full bg-slate-100 p-6 rounded-[24px] font-black border-0 outline-none mb-4" autocomplete="off">
                     <input type="text" id="tCustomer" list="customerDataList" placeholder="收货客户 (选填)" class="w-full bg-slate-100 p-6 rounded-[24px] font-black border-0 outline-none" autocomplete="off">
                 </div>
@@ -1183,8 +1191,52 @@
         }
 
         
+        // ===== 出库库存校验：前端预检 + 实时提示 =====
+        let _selectedProductBalance = -1; // -1 = 未选择产品
+        
+        function updateStockHint() {
+            const pid = getEl('tProd')?.value;
+            const hintEl = getEl('stockHint');
+            const hintVal = getEl('stockHintValue');
+            const warnEl = getEl('stockWarning');
+            if (!pid || !hintEl) { if(hintEl) hintEl.classList.add('hidden'); if(warnEl) warnEl.classList.add('hidden'); _selectedProductBalance = -1; return; }
+            const prod = products.find(p => String(p.id) === String(pid));
+            if (prod && typeof prod.balance === 'number') {
+                _selectedProductBalance = prod.balance;
+                hintEl.classList.remove('hidden');
+                hintVal.textContent = `${prod.balance} 包`;
+                hintVal.className = `text-xl font-black ${prod.balance > 0 ? 'text-amber-600' : 'text-rose-600'}`;
+                if(warnEl) warnEl.classList.add('hidden');
+            } else {
+                _selectedProductBalance = -1;
+                hintEl.classList.add('hidden');
+            }
+            validateStockQty();
+        }
+        
+        function validateStockQty() {
+            const warnEl = getEl('stockWarning');
+            const warnText = getEl('stockWarningText');
+            if (!warnEl || _selectedProductBalance < 0) return;
+            const qty = parseInt(getEl('tQty')?.value);
+            if (isNaN(qty) || qty <= 0) { warnEl.classList.add('hidden'); return; }
+            if (qty > _selectedProductBalance) {
+                warnEl.classList.remove('hidden');
+                warnText.textContent = `出库数量 ${qty} 超过可用库存 ${_selectedProductBalance}，将无法提交`;
+            } else {
+                warnEl.classList.add('hidden');
+            }
+        }
+
         function resetTransModal() {
             try {
+                // 重置库存提示
+                _selectedProductBalance = -1;
+                getEl('stockHint')?.classList.add('hidden');
+                getEl('stockWarning')?.classList.add('hidden');
+                getEl('tProd')?.removeEventListener('change', updateStockHint);
+                getEl('tQty')?.removeEventListener('input', validateStockQty);
+                
                 // 重置复选框
                 const isNew = getEl('isNew');
                 if(isNew) { isNew.checked = false; toggleQuickFields(); }
@@ -1227,6 +1279,16 @@
                 
                 getEl('typeText').innerText = isIn ? '产品入库 (+)' : '发货出库 (-)';
                 getEl('typeIcon').innerHTML = isIn ? '<i data-lucide="download" class="w-5 h-5"></i>' : '<i data-lucide="upload" class="w-5 h-5"></i>';
+                
+                // 出库模式：显示库存提示 + 实时校验
+                if (!isIn) {
+                    updateStockHint();
+                    getEl('tProd')?.addEventListener('change', updateStockHint);
+                    getEl('tQty')?.addEventListener('input', validateStockQty);
+                } else {
+                    getEl('stockHint')?.classList.add('hidden');
+                    getEl('stockWarning')?.classList.add('hidden');
+                }
                 
                 if(typeof lucide !== 'undefined') lucide.createIcons();
                 openModal('transModal');
@@ -1273,6 +1335,16 @@
                 if(!pid && !isN) {
                     getEl('globalLoading').classList.add('hidden');
                     return toast('⚠️ 请选择产品', 'bg-amber-500');
+                }
+                
+                // 出库前端预校验：数量 > 库存则拦截
+                if(type === 'out' && !isN && pid) {
+                    const prod = products.find(p => String(p.id) === String(pid));
+                    if(prod && typeof prod.balance === 'number' && Number(qtyVal) > prod.balance) {
+                        getEl('globalLoading').classList.add('hidden');
+                        btn.disabled = false; btn.innerText = '立即提交业务记录';
+                        return toast(`⚠️ 库存不足！当前库存 ${prod.balance} 包，无法出库 ${qtyVal} 包`, 'bg-rose-600');
+                    }
                 }
                 
                 if(type === 'out' && getEl('tCustomer').value) {
