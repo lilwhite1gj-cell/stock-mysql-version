@@ -85,49 +85,71 @@
         @media (max-width: 768px) {
             .bottom-nav.visible {
                 display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
-                background: rgba(255,255,255,0.92); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
-                border-top: 1px solid rgba(226,232,240,0.5);
-                padding: 4px 0 calc(4px + env(safe-area-inset-bottom, 0px));
+                background: rgba(255,255,255,0.95); backdrop-filter: blur(24px) saturate(200%); -webkit-backdrop-filter: blur(24px) saturate(200%);
+                border-top: 1px solid rgba(226,232,240,0.4);
+                padding: 6px 0 calc(6px + env(safe-area-inset-bottom, 0px));
                 justify-content: space-around; align-items: center;
-                box-shadow: 0 -1px 20px rgba(99,102,241,0.06), 0 -1px 4px rgba(0,0,0,0.03);
+                box-shadow: 0 -4px 24px rgba(99,102,241,0.08), 0 -1px 6px rgba(0,0,0,0.04);
             }
             .bottom-nav-item {
                 display: flex; flex-direction: column; align-items: center; justify-content: center;
-                padding: 6px 0 2px; min-width: 0; flex: 1; cursor: pointer;
-                color: #94a3b8; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+                padding: 8px 0 4px; min-width: 56px; flex: 1; cursor: pointer;
+                color: #94a3b8; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                 -webkit-tap-highlight-color: transparent; position: relative;
+                border-radius: 12px;
             }
-            .bottom-nav-item i { width: 22px; height: 22px; transition: all 0.25s ease; }
-            .bottom-nav-item span { font-size: 9px; font-weight: 700; margin-top: 2px; letter-spacing: 0.03em; transition: all 0.25s ease; }
+            .bottom-nav-item i { width: 24px; height: 24px; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+            .bottom-nav-item span { font-size: 10px; font-weight: 600; margin-top: 3px; letter-spacing: 0.02em; transition: all 0.3s ease; }
             .bottom-nav-item.active { color: #6366f1; }
-            .bottom-nav-item.active i { transform: scale(1.1); }
-            .bottom-nav-item.active span { font-weight: 900; }
+            .bottom-nav-item.active i { transform: scale(1.15) translateY(-1px); }
+            .bottom-nav-item.active span { font-weight: 800; }
             .bottom-nav-item.active::before {
-                content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
-                width: 20px; height: 3px; border-radius: 0 0 3px 3px;
+                content: ''; position: absolute; top: -1px; left: 50%; transform: translateX(-50%);
+                width: 24px; height: 3px; border-radius: 0 0 4px 4px;
                 background: linear-gradient(90deg, #6366f1, #818cf8);
+                box-shadow: 0 2px 8px rgba(99,102,241,0.4);
             }
-            .bottom-nav-item:active { transform: scale(0.88); }
+            /* 活跃tab背景光晕 */
+            .bottom-nav-item.active::after {
+                content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                width: 44px; height: 44px; border-radius: 50%;
+                background: radial-gradient(circle, rgba(99,102,241,0.1) 0%, transparent 70%);
+                pointer-events: none;
+            }
+            .bottom-nav-item:active { transform: scale(0.9); transition-duration: 0.1s; }
 
             /* 移动端主内容区底部留白(给底部导航栏) */
             #app-content { padding-bottom: 80px !important; }
 
             /* 移动端页面标题缩小 */
-            .text-4xl { font-size: 1.5rem !important; line-height: 2rem !important; }
+            .text-4xl { font-size: 1.375rem !important; line-height: 1.8rem !important; letter-spacing: -0.02em !important; }
 
             /* 移动端主内容区减少水平padding */
-            #mainContainer { padding: 0.75rem !important; }
+            #mainContainer { padding: 0.625rem !important; }
+
+            /* 移动端仪表盘页面间距紧凑 */
+            #page-dashboard { gap: 0.75rem !important; }
+            #page-dashboard > .flex { margin-bottom: 0 !important; }
 
             /* 移动端页面间距优化 */
             .page-content { gap: 0.75rem !important; }
 
-            /* 移动端统计卡片 */
-            #statCards .glass-card { padding: 0.875rem !important; border-radius: 20px !important; }
-            #statCards .text-3xl { font-size: 1.125rem !important; }
+            /* 移动端统计卡片 - 紧凑美观 */
+            #statCards { gap: 0.625rem !important; }
+            #statCards .glass-card { padding: 0.75rem 0.875rem !important; border-radius: 18px !important; }
+            #statCards .text-3xl { font-size: 1rem !important; line-height: 1.3 !important; }
+            #statCards .text-\[10px\] { font-size: 8px !important; margin-bottom: 4px !important; }
+            #statCards .bg-gradient-to-br { padding: 0.5rem !important; border-radius: 14px !important; }
+            #statCards .bg-gradient-to-br i, #statCards .bg-gradient-to-br svg { width: 16px !important; height: 16px !important; }
 
-            /* 移动端图表高度 */
-            #productQtyChart, #productValueChart { height: 220px !important; }
-            #sampleQtyChart { height: 240px !important; }
+            /* 移动端图表：环状图自适应正方形容器 */
+            .chart-doughnut-wrap { position: relative; width: 100%; max-width: 280px; margin: 0 auto; aspect-ratio: 1 / 1; }
+            .chart-doughnut-wrap canvas { width: 100% !important; height: 100% !important; }
+            #productQtyChart, #productValueChart { height: auto !important; }
+            #sampleQtyChart { height: 260px !important; }
+            /* 图表卡片移动端紧凑 */
+            .chart-card-mobile { padding: 1rem !important; border-radius: 20px !important; }
+            .chart-card-mobile h3 { font-size: 0.875rem !important; margin-bottom: 0.75rem !important; }
 
             /* 移动端登录表单适配 */
             #page-login > div { padding: 1.25rem !important; border-radius: 28px !important; margin: 0 6px; }
@@ -193,10 +215,13 @@
         @media (max-width: 375px) {
             .bottom-nav-item span { font-size: 8px; }
             .bottom-nav-item i { width: 20px; height: 20px; }
-            .bottom-nav-item { padding: 4px 0 1px; }
-            .text-4xl { font-size: 1.25rem !important; }
+            .bottom-nav-item { padding: 4px 0 1px; min-width: 48px; }
+            .text-4xl { font-size: 1.125rem !important; }
             .trans-filters { grid-template-columns: 1fr !important; }
             #mainContainer { padding: 0.5rem !important; }
+            #statCards .glass-card { padding: 0.625rem 0.75rem !important; }
+            #statCards .text-3xl { font-size: 0.875rem !important; }
+            .chart-doughnut-wrap { max-width: 240px; }
         }
     </style>
 </head>
@@ -292,10 +317,10 @@
                     <div class="flex items-center justify-between"><h2 class="text-4xl font-black text-slate-900 tracking-tighter">业务大盘</h2><span id="perfTag" class="px-4 py-1.5 bg-white/80 border border-slate-200/60 text-slate-400 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm backdrop-blur-sm"></span></div>
                     <div class="grid grid-cols-2 lg:grid-cols-4 gap-5" id="statCards"></div>
                     <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                        <div class="glass-card p-8"><h3 class="text-xl font-black mb-8 text-slate-700 text-center">产品数量占比</h3><div class="h-[300px] md:h-[400px]"><canvas id="productQtyChart"></canvas></div></div>
-                        <div class="glass-card p-8"><h3 class="text-xl font-black mb-8 text-slate-700 text-center">资产价值分布</h3><div class="h-[300px] md:h-[400px]"><canvas id="productValueChart"></canvas></div></div>
+                        <div class="glass-card p-8 chart-card-mobile"><h3 class="text-xl font-black mb-8 text-slate-700 text-center">产品数量占比</h3><div class="h-[300px] md:h-[400px] chart-doughnut-wrap md:max-w-none md:aspect-auto"><canvas id="productQtyChart"></canvas></div></div>
+                        <div class="glass-card p-8 chart-card-mobile"><h3 class="text-xl font-black mb-8 text-slate-700 text-center">资产价值分布</h3><div class="h-[300px] md:h-[400px] chart-doughnut-wrap md:max-w-none md:aspect-auto"><canvas id="productValueChart"></canvas></div></div>
                     </div>
-                    <div class="glass-card p-8"><h3 class="text-xl font-black mb-8 flex items-center text-slate-700 justify-center"><i data-lucide="beaker" class="mr-3 text-amber-500"></i>样品库实时存量 (包)</h3><div class="h-[350px] md:h-[500px]"><canvas id="sampleQtyChart"></canvas></div></div>
+                    <div class="glass-card p-8 chart-card-mobile"><h3 class="text-xl font-black mb-8 flex items-center text-slate-700 justify-center"><i data-lucide="beaker" class="mr-3 text-amber-500"></i>样品库实时存量 (包)</h3><div class="h-[350px] md:h-[500px]"><canvas id="sampleQtyChart"></canvas></div></div>
                     <div class="admin-only hidden glass-card p-8"><h3 class="text-xl font-black mb-8 text-slate-700 flex items-center justify-center"><i data-lucide="award" class="mr-3 text-orange-400"></i>员工贡献榜</h3><div id="perfList" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div></div>
                     <!-- 库存预警 -->
                     <div id="alertSection" class="hidden glass-card p-8 border-2 border-rose-100">
@@ -851,10 +876,17 @@
                 if (currentUser.role !== 'staff' && leaderboard) getEl('perfList').innerHTML = leaderboard.map((u, i) => `<div class="p-5 bg-white border border-slate-50 rounded-[28px] flex items-center justify-between shadow-sm"><div class="flex items-center space-x-4"><div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-black text-indigo-600 shadow-inner">${i+1}</div><span class="font-black text-slate-700">${u.username}</span></div><span class="text-indigo-600 font-black">¥ ${u.totalAmount.toLocaleString()}</span></div>`).join('');
                 const labels = productMix.map(p => p.name), qtyD = productMix.map(p => p.balance), valD = productMix.map(p => { const pr = products.find(prod => prod.name === p.name); return (p.balance * (pr?.unitPrice || 0)).toFixed(2); });
                 const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#0ea5e9'];
-                if (qtyChart) qtyChart.destroy(); qtyChart = new Chart(getEl('productQtyChart'), { type: 'doughnut', data: { labels, datasets: [{ data: qtyD, backgroundColor: colors, borderWidth: 0 }] }, options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, font: { weight: 'bold' } } } } } });
-                if (valueChart) valueChart.destroy(); valueChart = new Chart(getEl('productValueChart'), { type: 'doughnut', data: { labels, datasets: [{ data: valD, backgroundColor: colors, borderWidth: 0 }] }, options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, font: { weight: 'bold' } } } } } });
+                const isMobile = window.innerWidth <= 768;
+                const doughnutOpts = (title) => ({
+                    responsive: true, maintainAspectRatio: isMobile,
+                    cutout: isMobile ? '55%' : '60%',
+                    plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: isMobile ? 10 : 20, font: { weight: 'bold', size: isMobile ? 10 : 12 }, boxWidth: isMobile ? 8 : 12 } }, title: { display: false } },
+                    layout: { padding: isMobile ? { bottom: 4 } : { bottom: 10 } }
+                });
+                if (qtyChart) qtyChart.destroy(); qtyChart = new Chart(getEl('productQtyChart'), { type: 'doughnut', data: { labels, datasets: [{ data: qtyD, backgroundColor: colors, borderWidth: 0, hoverOffset: isMobile ? 6 : 12 }] }, options: doughnutOpts('产品数量占比') });
+                if (valueChart) valueChart.destroy(); valueChart = new Chart(getEl('productValueChart'), { type: 'doughnut', data: { labels, datasets: [{ data: valD, backgroundColor: colors, borderWidth: 0, hoverOffset: isMobile ? 6 : 12 }] }, options: doughnutOpts('资产价值分布') });
                 const sampleProducts = products.filter(p => p.category && p.category.includes('样品'));
-                if (sampleChart) sampleChart.destroy(); sampleChart = new Chart(getEl('sampleQtyChart'), { type: 'bar', data: { labels: sampleProducts.map(p => p.name), datasets: [{ data: sampleProducts.map(p => p.balance), backgroundColor: '#f59e0b', borderRadius: 12, barThickness: 24 }] }, options: { indexAxis: 'y', maintainAspectRatio: false, scales: { x: { grid: { display: false } }, y: { grid: { display: false }, ticks: { font: { weight: '800' } } } } } });
+                if (sampleChart) sampleChart.destroy(); sampleChart = new Chart(getEl('sampleQtyChart'), { type: 'bar', data: { labels: sampleProducts.map(p => p.name), datasets: [{ data: sampleProducts.map(p => p.balance), backgroundColor: '#f59e0b', borderRadius: isMobile ? 8 : 12, barThickness: isMobile ? 18 : 24 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { grid: { display: false }, ticks: { font: { size: isMobile ? 10 : 12 } } }, y: { grid: { display: false }, ticks: { font: { weight: '800', size: isMobile ? 10 : 12 } } } } } });
                 lucide.createIcons();
             } catch (e) { console.error('Dashboard load error:', e); }
         }
