@@ -11,46 +11,26 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 部署 src 目录
+      - name: 部署到 Hostinger FTP
         uses: SamKirkland/FTP-Deploy-Action@4.3.0
         with:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USER }}
           password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./src/
-          server-dir: public_html/src/
-          dangerous-clean-slate: false
-
-      - name: 部署 views 目录
-        uses: SamKirkland/FTP-Deploy-Action@4.3.0
-        with:
-          server: ${{ secrets.FTP_HOST }}
-          username: ${{ secrets.FTP_USER }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./views/
-          server-dir: public_html/views/
-          dangerous-clean-slate: false
-
-      - name: 部署 public 目录
-        uses: SamKirkland/FTP-Deploy-Action@4.3.0
-        with:
-          server: ${{ secrets.FTP_HOST }}
-          username: ${{ secrets.FTP_USER }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./public/
-          server-dir: public_html/public/
-          dangerous-clean-slate: false
-
-      - name: 部署配置文件
-        uses: SamKirkland/FTP-Deploy-Action@4.3.0
-        with:
-          server: ${{ secrets.FTP_HOST }}
-          username: ${{ secrets.FTP_USER }}
-          password: ${{ secrets.FTP_PASSWORD }}
+          port: 21
           local-dir: ./
           server-dir: public_html/
           dangerous-clean-slate: false
           exclude: |
-            **/*
-            !package.json
-            !package-lock.json
+            .git/**
+            .github/**
+            .joycode/**
+            node_modules/**
+            data/**
+            uploads/**
+            scripts/**
+            .env
+            .gitignore
+            README.md
+            start.bat
+            tmp_*
