@@ -13,8 +13,26 @@ import { getPool, initDatabase, queryRows, queryRow, execute, toSnakeCase } from
 
 dotenv.config();
 const app = express();
-app.use(cors());
-app.use(express.json());
+
+// 隐藏技术栈标识
+app.disable('x-powered-by');
+
+// 基础安全响应头（不启用 CSP，以免破坏页面内联脚本）
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  next();
+});
+
+// CORS：默认仅同源（生产如需跨域，用 CORS_ORIGIN 配置，逗号分隔）
+const allowedOrigins = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map(s => s.trim()).filter(Boolean) : [];
+app.use(cors({ origin: allowedOrigins.length ? allowedOrigins : false, credentials: false }));
+
+// 限制请求体大小，防止超大请求导致拒绝服务
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -67,8 +85,20 @@ const mysqlInitPromise = process.env.MYSQL_HOST
 
 // --- Cloudinary ---
 cloudinary.config({ cloud_name: process.env.CLOUDINARY_NAME, api_key: process.env.CLOUDINARY_KEY, api_secret: process.env.CLOUDINARY_SECRET });
-const storage = isProduction ? new CloudinaryStorage({ cloudinary, params: { folder: 'inventory_pro' } }) : multer.diskStorage({ destination: (req, file, cb) => cb(null, path.join(__dirname, '../uploads')), filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname) });
-const upload = multer({ storage });
+// 净化文件名：仅保留安全字符，杜绝引号/路径穿越导致的 XSS 与属性注入
+const sanitizeFilename = (name) => String(name || '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-100);
+const storage = isProduction ? new CloudinaryStorage({ cloudinary, params: { folder: 'inventory_pro' } }) : multer.diskStorage({ destination: (req, file, cb) => cb(null, path.join(__dirname, '../uploads')), filename: (req, file, cb) => cb(null, Date.now() + '-' + sanitizeFilename(file.originalname)) });
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 }, // 单文件最大 5MB
+  fileFilter: (req, file, cb) => {
+    // 仅允许图片类型上传，阻断恶意文件（HTML/SVG 等）导致的存储型 XSS
+    if (!file.mimetype || !file.mimetype.startsWith('image/')) {
+      return cb(new Error('仅允许上传图片文件'));
+    }
+    cb(null, true);
+  }
+});
 
 // --- MySQL就绪检查中间件 ---
 // MySQL可用时强制走MySQL；MySQL不可用时自动回退到本地JSON
@@ -88,6 +118,26 @@ const authenticate = (req, res, next) => {
   });
 };
 
+// --- 简单内存限流（防止暴力破解 / 账号枚举），无需额外依赖 ---
+const _rateBuckets = new Map();
+function makeLimiter(max, windowMs) {
+  return (req, res, next) => {
+    const routePath = (req.route && req.route.path) || req.path;
+    const key = (req.ip || req.socket.remoteAddress || 'unknown') + ':' + routePath;
+    const now = Date.now();
+    const b = _rateBuckets.get(key);
+    if (!b || now - b.start > windowMs) {
+      _rateBuckets.set(key, { start: now, count: 1 });
+      return next();
+    }
+    b.count++;
+    if (b.count > max) return res.status(429).json({ message: '请求过于频繁，请稍后再试' });
+    next();
+  };
+}
+const limLogin = makeLimiter(10, 60 * 1000);   // 登录：每分钟 10 次
+const limReset = makeLimiter(5, 60 * 1000);    // 找回/重置密码：每分钟 5 次
+
 // --- 公开路由 ---
 app.get('/', (req, res) => res.render('index'));
 app.get('/api/categories', async (req, res) => {
@@ -103,6 +153,8 @@ app.get('/api/categories', async (req, res) => {
 app.post('/api/register', async (req, res) => {
   const { username, password, phone, question, answer } = req.body;
   if (!username || !password) return res.status(400).json({ message: '用户名和密码不能为空' });
+  // 用户名限定安全字符集（中英文/数字/._@-），防止引号等破坏前端上下文造成注入
+  if (!/^[一-龥A-Za-z0-9._@-]{2,30}$/.test(username)) return res.status(400).json({ message: '用户名格式不合法（仅限中英文、数字及 . _ @ - ，长度2-30）' });
   const hashedPassword = await bcrypt.hash(password, 10);
   let defaultRole = 'staff';
   if (!useMySQL) {
@@ -124,7 +176,7 @@ app.post('/api/register', async (req, res) => {
     } catch (e) {
       if (e.code === 'ER_DUP_ENTRY' || e.errno === 1062) return res.status(400).json({ message: '用户名已存在' });
       console.error('注册失败:', e.message);
-      return res.status(400).json({ message: '注册失败: ' + (e.sqlMessage || e.message) });
+      return res.status(400).json({ message: '注册失败，请稍后重试' });
     }
   } else {
     const db = getLocalData();
@@ -136,7 +188,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', limLogin, async (req, res) => {
   const { username, password } = req.body;
   let user;
   if (useMySQL) {
@@ -150,7 +202,7 @@ app.post('/api/login', async (req, res) => {
   res.json({ token, user: { id, username: user.username, role: user.role } });
 });
 
-app.get('/api/forgot-password-verify', async (req, res) => {
+app.get('/api/forgot-password-verify', limReset, async (req, res) => {
   const { username } = req.query;
   let user;
   if (useMySQL) {
@@ -162,7 +214,7 @@ app.get('/api/forgot-password-verify', async (req, res) => {
   res.json({ question: user.securityQuestion || user.security_question });
 });
 
-app.post('/api/reset-password-now', async (req, res) => {
+app.post('/api/reset-password-now', limReset, async (req, res) => {
   const { username, phone, answer, newPassword } = req.body;
   let user;
   if (useMySQL) {
@@ -339,7 +391,7 @@ app.post('/api/transactions', authenticate, upload.single('transImage'), async (
         return res.json(data);
       } catch (e) {
         await conn.rollback();
-        return res.status(500).json({ message: '出库操作失败：' + e.message });
+        return res.status(500).json({ message: '出库操作失败，请稍后重试' });
       } finally {
         conn.release();
       }
@@ -398,7 +450,7 @@ app.delete('/api/transactions/:id', authenticate, async (req, res) => {
       res.json({ message: 'Success' });
     } catch (e) {
       await conn.rollback();
-      res.status(500).json({ message: '删除失败：' + e.message });
+      res.status(500).json({ message: '删除失败，请稍后重试' });
     } finally {
       conn.release();
     }
@@ -470,7 +522,12 @@ app.post('/api/update-profile', authenticate, async (req, res) => {
   const { newUsername, oldPassword, newPassword } = req.body;
   if (useMySQL) {
     const user = await queryRow('SELECT * FROM users WHERE id = ?', [req.user.id]);
-    if (newUsername) await execute('UPDATE users SET username = ? WHERE id = ?', [newUsername, req.user.id]);
+    if (newUsername) {
+      if (!/^[一-龥A-Za-z0-9._@-]{2,30}$/.test(newUsername)) return res.status(400).json({ message: '用户名格式不合法' });
+      const exist = await queryRow('SELECT id FROM users WHERE username = ? AND id != ?', [newUsername, req.user.id]);
+      if (exist) return res.status(400).json({ message: '该用户名已被占用' });
+      await execute('UPDATE users SET username = ? WHERE id = ?', [newUsername, req.user.id]);
+    }
     if (newPassword) {
       if (!(await bcrypt.compare(oldPassword, user.password))) return res.status(401).json({ message: '旧密码错误' });
       const hashed = await bcrypt.hash(newPassword, 10);
@@ -481,7 +538,11 @@ app.post('/api/update-profile', authenticate, async (req, res) => {
   } else {
     const db = getLocalData();
     const idx = db.users.findIndex(u => u.id === req.user.id);
-    if (newUsername) db.users[idx].username = newUsername;
+    if (newUsername) {
+      if (!/^[一-龥A-Za-z0-9._@-]{2,30}$/.test(newUsername)) return res.status(400).json({ message: '用户名格式不合法' });
+      if (db.users.some(u => u.id !== req.user.id && u.username === newUsername)) return res.status(400).json({ message: '该用户名已被占用' });
+      db.users[idx].username = newUsername;
+    }
     if (newPassword) {
       if (!(await bcrypt.compare(oldPassword, db.users[idx].password))) return res.status(401).json({ message: '旧密码错误' });
       db.users[idx].password = await bcrypt.hash(newPassword, 10);
@@ -665,6 +726,13 @@ app.get('/api/inventory/alerts', authenticate, async (req, res) => {
 });
 
 // --- CSV 导出 ---
+// CSV 单元格转义：双引号转义 + 防 Excel 公式注入（以 = + - @ 开头时加前缀）
+const csvCell = (v) => {
+  let s = String(v ?? '').replace(/"/g, '""');
+  if (/^[=+\-@]/.test(s)) s = "'" + s;
+  return '"' + s + '"';
+};
+
 app.get('/api/export/inventory', authenticate, async (req, res) => {
   let products, transactions;
   if (useMySQL) {
@@ -683,7 +751,7 @@ app.get('/api/export/inventory', authenticate, async (req, res) => {
     return [p.name, p.sku || '', p.category || '', p.unitPrice || p.unit_price || 0, p.currency || 'CNY', balance, totalIn, totalOut, p.creatorName || p.creator_name || ''];
   });
   const header = '产品名称,货号SKU,品类,单价,币种,当前库存,累计入库,累计出库,创建人';
-  const csv = '\uFEFF' + header + '\n' + rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+  const csv = '\uFEFF' + header + '\n' + rows.map(r => r.map(csvCell).join(',')).join('\n');
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="inventory_' + new Date().toISOString().slice(0, 10) + '.csv"');
   res.send(csv);
@@ -705,7 +773,7 @@ app.get('/api/export/transactions', authenticate, async (req, res) => {
     return [d.toLocaleDateString('zh-CN'), d.toLocaleTimeString('zh-CN'), prodMap[String(t.productId || t.product_id)] || '', t.type === 'in' ? '入库' : '出库', t.quantity, t.customerName || t.customer_name || '', t.receiver || '', t.batchNo || t.batch_no || '', t.orderNo || t.order_no || '', t.logisticsNo || t.logistics_no || '', t.username || '', t.notes || ''];
   });
   const header = '日期,时间,产品名称,类型,数量,客户,领用人,批次号,订单号,物流号,操作人,备注';
-  const csv = '\uFEFF' + header + '\n' + rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+  const csv = '\uFEFF' + header + '\n' + rows.map(r => r.map(csvCell).join(',')).join('\n');
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="transactions_' + new Date().toISOString().slice(0, 10) + '.csv"');
   res.send(csv);
