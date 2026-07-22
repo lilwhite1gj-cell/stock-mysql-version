@@ -139,7 +139,13 @@ const limLogin = makeLimiter(10, 60 * 1000);   // 登录：每分钟 10 次
 const limReset = makeLimiter(5, 60 * 1000);    // 找回/重置密码：每分钟 5 次
 
 // --- 版本信息 ---
-const pkgVersion = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8')).version;
+let pkgVersion = 'unknown';
+try {
+  const pkgPath = path.join(__dirname, '../package.json');
+  console.log('[版本] 读取 package.json:', pkgPath);
+  pkgVersion = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version;
+  console.log('[版本] 当前版本:', pkgVersion);
+} catch (e) { console.error('[版本] 读取版本号失败:', e.message); }
 
 // --- 公开路由 ---
 app.get('/', (req, res) => res.render('index'));

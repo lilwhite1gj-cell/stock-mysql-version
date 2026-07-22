@@ -64,3 +64,32 @@ jobs:
             README.md
             start.bat
             tmp_*
+
+      - name: 触发 Passenger 重启
+        run: |
+          echo "Restart at $(date -u +%Y-%m-%dT%H:%M:%SZ)" > restart.txt
+      - uses: SamKirkland/FTP-Deploy-Action@4.3.0
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: 21
+          local-dir: ./
+          server-dir: public_html/tmp/
+          exclude: |
+            .git/**
+            .github/**
+            .joycode/**
+            node_modules/**
+            data/**
+            uploads/**
+            scripts/**
+            src/**
+            views/**
+            public/**
+            package*.json
+            CHANGELOG.md
+            .env
+            .gitignore
+            README.md
+            start.bat

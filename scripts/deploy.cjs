@@ -69,6 +69,7 @@ async function deploy() {
       { local: 'public', remote: 'public', type: 'dir' },
       { local: 'package.json', remote: 'package.json', type: 'file' },
       { local: 'package-lock.json', remote: 'package-lock.json', type: 'file' },
+      { local: 'CHANGELOG.md', remote: 'CHANGELOG.md', type: 'file' },
       { local: '.env', remote: '.env', type: 'file' },
     ];
     
@@ -92,6 +93,25 @@ async function deploy() {
     // 在远程创建uploads目录
     console.log('\n📁 确保uploads目录存在...');
     await client.ensureDir('uploads');
+    
+    // 创建 tmp/restart.txt 触发 Passenger 重启
+    console.log('\n🔄 触发 Passenger 应用重启...');
+    try {
+      const tmpDir = `${remotePath}/tmp`;
+      await client.ensureDir(tmpDir);
+      // ensureDir 后 CWD 已在 tmp 目录，直接用文件名上传
+      const restartContent = `Restart triggered at ${new Date().toISOString()}`;
+      const tmpRestartPath = path.join(localDir, 'tmp_restart.txt');
+      fs.writeFileSync(tmpRestartPath, restartContent);
+      await client.uploadFrom(tmpRestartPath, 'restart.txt');
+      fs.unlinkSync(tmpRestartPath);
+      console.log('✅ tmp/restart.txt 已创建，Passenger 将在下次请求时重启应用');
+      // 回到 public_html 目录
+      await client.cd(`/${remotePath}`);
+    } catch (restartErr) {
+      console.log('⚠️ 创建 restart.txt 失败（非致命）:', restartErr.message);
+      console.log('   请在 Hostinger 面板手动重启 Node.js 应用');
+    }
     
     // 创建启动脚本
     console.log('\n📄 创建远程启动脚本...');
