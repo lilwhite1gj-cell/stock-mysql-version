@@ -138,8 +138,20 @@ function makeLimiter(max, windowMs) {
 const limLogin = makeLimiter(10, 60 * 1000);   // 登录：每分钟 10 次
 const limReset = makeLimiter(5, 60 * 1000);    // 找回/重置密码：每分钟 5 次
 
+// --- 版本信息 ---
+import { readFileSync } from 'fs';
+const pkgVersion = JSON.parse(readFileSync(path.join(__dirname, '../package.json'), 'utf8')).version;
+
 // --- 公开路由 ---
 app.get('/', (req, res) => res.render('index'));
+app.get('/api/version', (req, res) => {
+  try {
+    const changelog = readFileSync(path.join(__dirname, '../CHANGELOG.md'), 'utf8');
+    res.json({ version: pkgVersion, changelog });
+  } catch {
+    res.json({ version: pkgVersion, changelog: '' });
+  }
+});
 app.get('/api/categories', async (req, res) => {
   if (useMySQL) {
     const rows = await queryRows('SELECT name FROM categories');
