@@ -49,7 +49,7 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           port: 21
           local-dir: ./
-          server-dir: public_html/
+          server-dir: /
           dangerous-clean-slate: false
           exclude: |
             .git/**
@@ -75,7 +75,7 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           port: 21
           local-dir: ./
-          server-dir: public_html/tmp/
+          server-dir: /tmp/
           exclude: |
             .git/**
             .github/**

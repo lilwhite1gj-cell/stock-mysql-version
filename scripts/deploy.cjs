@@ -41,7 +41,7 @@ async function deploy() {
     process.exit(1);
   }
   
-  const remotePath = env.FTP_PATH || 'public_html';
+  const remotePath = env.FTP_PATH || '/';
   const localDir = path.join(__dirname, '..');
   
   console.log('🚀 开始部署到FTP服务器...');
@@ -106,7 +106,7 @@ async function deploy() {
       await client.uploadFrom(tmpRestartPath, 'restart.txt');
       fs.unlinkSync(tmpRestartPath);
       console.log('✅ tmp/restart.txt 已创建，Passenger 将在下次请求时重启应用');
-      // 回到 public_html 目录
+      // 回到应用根目录
       await client.cd(`/${remotePath}`);
     } catch (restartErr) {
       console.log('⚠️ 创建 restart.txt 失败（非致命）:', restartErr.message);
