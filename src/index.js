@@ -46,6 +46,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // --- 模式切换 ---
 let useMySQL = false;
 let mysqlReady = false; // MySQL连接是否就绪
+let mysqlInitError = null; // MySQL初始化失败的错误信息（用于诊断）
 const isProduction = process.env.NODE_ENV === 'production';
 
 // --- 本地数据驱动 (原生 FS 强制同步) ---
@@ -81,6 +82,7 @@ const mysqlInitPromise = process.env.MYSQL_HOST
       .catch((err) => {
         useMySQL = false;
         mysqlReady = false;
+        mysqlInitError = err.message;
         console.log('⚠️ DATABASE: MySQL连接失败，回退到本地JSON存储');
         console.log('⚠️ MySQL连接报错详情:', err.message);
         console.log('💡 提示: 数据将保存到本地data/db.json，MySQL可用后需重新导入');
@@ -154,6 +156,7 @@ app.get('/api/health', async (req, res) => {
     envFileExists: fs.existsSync(envPath),
     dbMode: useMySQL ? 'MySQL' : (process.env.MYSQL_HOST ? 'Local JSON (MySQL连接失败)' : 'Local JSON (未配置MYSQL_HOST)'),
     mysqlReady,
+    mysqlInitError: mysqlInitError || undefined,
     mysqlHost: process.env.MYSQL_HOST || '未配置',
     mysqlDatabase: process.env.MYSQL_DATABASE || '未配置',
     envLoaded: !!process.env.JWT_SECRET,
