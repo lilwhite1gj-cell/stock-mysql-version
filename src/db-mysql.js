@@ -200,13 +200,3 @@ function toCamelCase(obj) {
   }
   return result;
 }
-
-// camelCase → snake_case 转换
-export function toSnakeCase(obj) {
-  const result = {};
-  for (const key of Object.keys(obj)) {
-    const snakeKey = key.replace(/[A-Z]/g, c => '_' + c.toLowerCase());
-    result[snakeKey] = obj[key];
-  }
-  return result;
-}

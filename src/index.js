@@ -9,7 +9,8 @@ import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import fs from 'fs';
 import path from 'path';
-import { getPool, initDatabase, queryRows, queryRow, execute, toSnakeCase } from './db-mysql.js';
+import os from 'os';
+import { getPool, initDatabase, queryRows, queryRow, execute } from './db-mysql.js';
 
 // 先解析 __dirname，再加载 .env（确保 Passenger 等非标准 CWD 环境也能找到配置）
 const __filename = fileURLToPath(import.meta.url);
@@ -106,12 +107,6 @@ const upload = multer({
   }
 });
 
-// --- MySQL就绪检查中间件 ---
-// MySQL可用时强制走MySQL；MySQL不可用时自动回退到本地JSON
-const requireMySQL = (req, res, next) => {
-  next();
-};
-
 // 所有API路由：MySQL可用时走MySQL，否则走本地JSON（无需额外拦截）
 
 // --- Auth 中间件 ---
@@ -159,6 +154,10 @@ app.get('/api/health', async (req, res) => {
     mysqlInitError: mysqlInitError || undefined,
     mysqlHost: process.env.MYSQL_HOST || '未配置',
     mysqlDatabase: process.env.MYSQL_DATABASE || '未配置',
+    // 诊断：仅暴露密码长度与是否以 # 结尾（不泄露密码内容），用于确认特殊字符是否被启动器吞掉
+    mysqlPasswordLength: (process.env.MYSQL_PASSWORD || '').length,
+    mysqlPasswordEndsWithHash: (process.env.MYSQL_PASSWORD || '').endsWith('#'),
+    mysqlPasswordAllAlnum: /^[A-Za-z0-9]+$/.test(process.env.MYSQL_PASSWORD || ''),
     envLoaded: !!process.env.JWT_SECRET,
     nodeEnv: process.env.NODE_ENV || '未设置',
     dataDir: fs.existsSync(path.join(__dirname, '../data')) ? '存在' : '不存在',
@@ -727,7 +726,8 @@ app.get('/api/exchange-rate', async (req, res) => {
   try {
     let cache = useMySQL ? await queryRow("SELECT value FROM config WHERE `key` = 'exchange_rate'") : null;
     const now = Date.now();
-    if (cache && cache.value && (now - new Date(cache.value.lastUpdate).getTime() < 12 * 60 * 60 * 1000)) {
+    const force = req.query.force === 'true' || req.query.force === '1';
+    if (!force && cache && cache.value && (now - new Date(cache.value.lastUpdate).getTime() < 12 * 60 * 60 * 1000)) {
       return res.json(cache.value);
     }
     const resp = await fetch('https://open.er-api.com/v6/latest/USD');
@@ -960,7 +960,6 @@ app.post('/api/backup/import', authenticate, async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-import os from 'os';
 app.listen(PORT, '0.0.0.0', async () => {
   // 等待MySQL初始化完成，避免竞态条件导致启动消息显示错误
   await mysqlInitPromise;
