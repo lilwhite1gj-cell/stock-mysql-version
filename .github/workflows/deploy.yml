@@ -49,7 +49,7 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           port: 21
           local-dir: ./
-          server-dir: /
+          server-dir: /stock-mysql-version-main/
           dangerous-clean-slate: false
           exclude: |
             .git/**
@@ -75,7 +75,7 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           port: 21
           local-dir: ./
-          server-dir: /tmp/
+          server-dir: /stock-mysql-version-main/tmp/
           exclude: |
             .git/**
             .github/**

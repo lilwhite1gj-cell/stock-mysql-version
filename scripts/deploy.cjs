@@ -41,7 +41,7 @@ async function deploy() {
     process.exit(1);
   }
   
-  const remotePath = env.FTP_PATH || '/';
+  const remotePath = env.FTP_PATH || '/stock-mysql-version-main';
   const localDir = path.join(__dirname, '..');
   
   console.log('🚀 开始部署到FTP服务器...');
@@ -70,8 +70,16 @@ async function deploy() {
       { local: 'package.json', remote: 'package.json', type: 'file' },
       { local: 'package-lock.json', remote: 'package-lock.json', type: 'file' },
       { local: 'CHANGELOG.md', remote: 'CHANGELOG.md', type: 'file' },
-      { local: '.env', remote: '.env', type: 'file' },
     ];
+    
+    // 上传生产环境 .env（用 .env.production 覆盖服务器 .env）
+    const envProdPath = path.join(localDir, '.env.production');
+    if (fs.existsSync(envProdPath)) {
+      console.log('📄 上传生产环境配置: .env.production → .env');
+      await client.uploadFrom(envProdPath, '.env');
+    } else {
+      console.log('⚠️ 未找到 .env.production，跳过上传服务器配置');
+    }
     
     // 上传文件
     for (const item of uploadItems) {

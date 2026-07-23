@@ -11,7 +11,10 @@ import fs from 'fs';
 import path from 'path';
 import { getPool, initDatabase, queryRows, queryRow, execute, toSnakeCase } from './db-mysql.js';
 
-dotenv.config();
+// 先解析 __dirname，再加载 .env（确保 Passenger 等非标准 CWD 环境也能找到配置）
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.join(__dirname, '../.env') });
 const app = express();
 
 // 隐藏技术栈标识
@@ -33,9 +36,6 @@ app.use(cors({ origin: allowedOrigins.length ? allowedOrigins : false, credentia
 // 限制请求体大小，防止超大请求导致拒绝服务
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // --- 静态资源与模板 ---
 app.set('view engine', 'ejs');
@@ -142,6 +142,38 @@ function makeLimiter(max, windowMs) {
 const limLogin = makeLimiter(10, 60 * 1000);   // 登录：每分钟 10 次
 const limReset = makeLimiter(5, 60 * 1000);    // 找回/重置密码：每分钟 5 次
 
+// --- 健康检查端点（诊断数据库连接状态） ---
+app.get('/api/health', async (req, res) => {
+  const envPath = path.join(__dirname, '../.env');
+  const info = {
+    version: pkgVersion,
+    nodeVersion: process.version,
+    cwd: process.cwd(),
+    dirname: __dirname,
+    envPath,
+    envFileExists: fs.existsSync(envPath),
+    dbMode: useMySQL ? 'MySQL' : (process.env.MYSQL_HOST ? 'Local JSON (MySQL连接失败)' : 'Local JSON (未配置MYSQL_HOST)'),
+    mysqlReady,
+    mysqlHost: process.env.MYSQL_HOST || '未配置',
+    mysqlDatabase: process.env.MYSQL_DATABASE || '未配置',
+    envLoaded: !!process.env.JWT_SECRET,
+    nodeEnv: process.env.NODE_ENV || '未设置',
+    dataDir: fs.existsSync(path.join(__dirname, '../data')) ? '存在' : '不存在',
+    dbFile: fs.existsSync(dbPath) ? '存在' : '不存在',
+  };
+  if (useMySQL) {
+    try {
+      const [rows] = await (await getPool()).query('SELECT COUNT(*) as cnt FROM users');
+      info.mysqlUserCount = rows[0].cnt;
+    } catch (e) {
+      info.mysqlError = e.message;
+    }
+  } else {
+    info.localUserCount = getLocalData().users.length;
+  }
+  res.json(info);
+});
+
 // --- 版本信息 ---
 let pkgVersion = 'unknown';
 try {
@@ -168,32 +200,6 @@ app.get('/api/categories', async (req, res) => {
   } else {
     res.json(getLocalData().categories);
   }
-});
-
-// --- 诊断端点（生产环境排查用） ---
-app.get('/api/health', async (req, res) => {
-  const info = {
-    version: pkgVersion,
-    nodeVersion: process.version,
-    dbMode: useMySQL ? 'MySQL' : (process.env.MYSQL_HOST ? 'Local JSON (MySQL连接失败)' : 'Local JSON (未配置MYSQL_HOST)'),
-    mysqlReady,
-    mysqlHost: process.env.MYSQL_HOST ? '已配置' : '未配置',
-    mysqlDatabase: process.env.MYSQL_DATABASE ? '已配置' : '未配置',
-    envLoaded: !!process.env.JWT_SECRET,
-    dataDir: fs.existsSync(path.join(__dirname, '../data')) ? '存在' : '不存在',
-    dbFile: fs.existsSync(dbPath) ? '存在' : '不存在',
-  };
-  if (useMySQL) {
-    try {
-      const [rows] = await (await getPool()).query('SELECT COUNT(*) as cnt FROM users');
-      info.mysqlUserCount = rows[0].cnt;
-    } catch (e) {
-      info.mysqlError = e.message;
-    }
-  } else {
-    info.localUserCount = getLocalData().users.length;
-  }
-  res.json(info);
 });
 
 // --- API 核心逻辑 ---
