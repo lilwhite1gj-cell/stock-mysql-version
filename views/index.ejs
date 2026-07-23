@@ -278,7 +278,8 @@
 
         /* ---------- 3. 桌面端 / 平板端 布局 ---------- */
         @media (min-width: 1024px) {
-            #mainContainer { max-width: 1440px; margin: 0 auto; width: 100%; }
+            /* 让主滚动容器占满右侧区域，滚动条贴屏幕边缘；内容区内边距由 lg:p-10 保留 */
+            #mainContainer { width: 100%; }
         }
         @media (min-width: 768px) and (max-width: 1023px) {
             #mainContainer { padding: 1.75rem; }
