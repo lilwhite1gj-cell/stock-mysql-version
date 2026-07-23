@@ -598,7 +598,7 @@
                             </div>
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center space-x-3">
-                                    <span class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-500 text-white rounded-2xl text-sm font-black shadow-lg shadow-indigo-200/50" id="versionBadge">v1.1.41</span>
+                                    <span class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-500 text-white rounded-2xl text-sm font-black shadow-lg shadow-indigo-200/50" id="versionBadge">v1.1.43</span>
                                     <span class="text-xs text-slate-400 font-bold" id="versionDate"></span>
                                 </div>
                                 <button onclick="showChangelog()" class="flex items-center space-x-2 px-5 py-3 bg-slate-50 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 rounded-2xl font-bold text-sm transition-all active:scale-95">
@@ -1673,7 +1673,7 @@
         function updateProductSelects() { const el = getEl('tProd'); if(el) el.innerHTML = '<option value="" disabled selected>🔍 选择产品...</option>' + products.map(p => `<option value="${p.id}">${esc(p.name)} / ${esc(p.sku)}</option>`).join(''); }
 
         // --- 版本信息 ---
-        let appVersion = '1.1.41';
+        let appVersion = '1.1.43';
         async function fetchVersion() {
             try {
                 const res = await api.get('/version');
