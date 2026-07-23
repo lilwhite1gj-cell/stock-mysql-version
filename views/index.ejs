@@ -449,7 +449,7 @@
                                 <button onclick="exportInventoryCSV()" class="px-4 py-2 bg-white border border-slate-200/80 rounded-xl text-xs font-black text-emerald-600 shadow-sm active:scale-95 transition-all flex items-center hover:shadow-md"><i data-lucide="file-spreadsheet" class="w-3 h-3 mr-1"></i>导出CSV</button>
                                 <button onclick="openAddProdModal()" class="bg-gradient-to-br from-indigo-500 to-indigo-700 text-white w-14 h-14 rounded-2xl shadow-2xl shadow-indigo-300/40 flex items-center justify-center active:scale-90 transition-all hover:shadow-indigo-400/50"><i data-lucide="plus" class="w-8 h-8"></i></button>
                             </div>
-                            <span onclick="fetchExchangeRate()" class="rate-display cursor-pointer hover:text-indigo-600 transition-colors text-[9px] font-black text-slate-400 bg-white/80 px-2 py-0.5 rounded-md tracking-widest text-center border border-slate-100/60" title="点击手动刷新汇率">正在同步汇率...</span>
+                            <span onclick="fetchExchangeRate()" class="rate-display cursor-pointer hover:text-indigo-600 transition-colors text-xs font-black text-slate-500 bg-white/80 px-2 py-0.5 rounded-md tracking-widest text-center border border-slate-100/60" title="点击手动刷新汇率">正在同步汇率...</span>
                         </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -458,23 +458,23 @@
                             <div class="flex items-center space-x-3">
                                 <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm"><i data-lucide="calculator" class="w-5 h-5 text-white"></i></div>
                                 <div>
-                                    <p class="text-[9px] font-black uppercase opacity-70 tracking-widest">当前库存总估值</p>
+                                    <p class="text-xs font-black uppercase opacity-70 tracking-widest">当前库存总估值</p>
                                     <p id="totalInvValue" class="text-xl font-black tracking-tighter">¥ 0.00</p>
                                 </div>
                             </div>
                         </div>
-                        <div class="md:col-span-3 flex items-center space-x-3 bg-white/90 backdrop-blur-sm px-6 py-4 rounded-[22px] shadow-sm border border-slate-100/80 self-end md:self-start"><span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sort By:</span><select id="invSortField" onchange="renderInventory()" class="bg-transparent outline-none font-black text-sm text-indigo-600"><option value="id">录入时间</option><option value="name">产品名称</option><option value="customerName">客户维度</option><option value="balance">库存量</option><option value="value">资产价值</option></select></div>
+                        <div class="md:col-span-3 flex items-center space-x-3 bg-white/90 backdrop-blur-sm px-6 py-4 rounded-[22px] shadow-sm border border-slate-100/80 self-end md:self-start"><span class="text-xs font-black text-slate-600 uppercase tracking-widest">Sort By:</span><select id="invSortField" onchange="renderInventory()" class="bg-transparent outline-none font-black text-sm text-indigo-600"><option value="id">录入时间</option><option value="name">产品名称</option><option value="customerName">客户维度</option><option value="balance">库存量</option><option value="value">资产价值</option></select></div>
                     </div>
                     <div class="hidden md:block glass-card table-container-fix overflow-x-auto border border-slate-100">
                         <table class="w-full text-left border-collapse table-fixed min-w-[1000px]">
                             <thead class="bg-slate-50/50 border-b border-slate-100">
                                 <tr>
-                                    <th class="w-[16%] p-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">产品名称</th>
-                                    <th class="w-[16%] p-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">参数 (品类/尺寸/材质)</th>
-                                    <th class="w-[16%] p-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">维度 (客户/工厂)</th>
-                                    <th class="w-[18%] p-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">计价/库存</th>
-                                    <th class="w-[12%] p-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">最后变动经办</th>
-                                    <th class="w-[22%] p-8 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">资产总额 (实时)</th>
+                                    <th class="w-[16%] p-8 text-xs font-black text-slate-600 uppercase tracking-widest">产品名称</th>
+                                    <th class="w-[16%] p-8 text-xs font-black text-slate-600 uppercase tracking-widest text-center">参数 (品类/尺寸/材质)</th>
+                                    <th class="w-[16%] p-8 text-xs font-black text-slate-600 uppercase tracking-widest text-center">维度 (客户/工厂)</th>
+                                    <th class="w-[18%] p-8 text-xs font-black text-slate-600 uppercase tracking-widest text-center">计价/库存</th>
+                                    <th class="w-[12%] p-8 text-xs font-black text-slate-600 uppercase tracking-widest text-center">最后变动经办</th>
+                                    <th class="w-[22%] p-8 text-right text-xs font-black text-slate-600 uppercase tracking-widest">资产总额 (实时)</th>
                                 </tr>
                             </thead>
                             <tbody id="invTable" class="divide-y divide-slate-50"></tbody>
@@ -495,14 +495,14 @@
                                     <button onclick="openTransModal('out')" class="ml-1 bg-gradient-to-r from-rose-500 to-rose-600 text-white px-6 py-3 rounded-2xl font-black text-xs flex items-center active:scale-95 transition-all hover:from-rose-600 hover:to-rose-700 shadow-lg shadow-rose-200/50"><i data-lucide="upload" class="w-4 h-4 mr-2"></i>出库</button>
                                 </div>
                             </div>
-                            <span onclick="fetchExchangeRate()" class="rate-display cursor-pointer hover:text-indigo-600 transition-colors text-[9px] font-black text-slate-400 bg-white/80 px-2 py-0.5 rounded-md tracking-widest text-center border border-slate-100/60" title="点击手动刷新汇率">正在同步汇率...</span>
+                            <span onclick="fetchExchangeRate()" class="rate-display cursor-pointer hover:text-indigo-600 transition-colors text-xs font-black text-slate-500 bg-white/80 px-2 py-0.5 rounded-md tracking-widest text-center border border-slate-100/60" title="点击手动刷新汇率">正在同步汇率...</span>
                         </div>
                     </div>
 
                     <!-- 增强型过滤器 -->
                     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 trans-filters">
                         <div class="flex items-center space-x-2 bg-white px-4 py-3 rounded-2xl shadow-sm border border-slate-100">
-                            <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">类型</span>
+                            <span class="text-xs font-black text-slate-500 uppercase tracking-widest">类型</span>
                             <select id="transFilterType" onchange="renderTrans()" class="bg-transparent outline-none font-black text-xs text-indigo-600 flex-1">
                                 <option value="all">全部明细</option>
                                 <option value="in">仅入库</option>
@@ -510,7 +510,7 @@
                             </select>
                         </div>
                         <div class="flex items-center space-x-2 bg-white px-4 py-3 rounded-2xl shadow-sm border border-slate-100">
-                            <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">排序</span>
+                            <span class="text-xs font-black text-slate-500 uppercase tracking-widest">排序</span>
                             <select id="transSortField" onchange="renderTrans()" class="bg-transparent outline-none font-black text-xs text-indigo-600 flex-1">
                                 <option value="dateDesc">日期: 最近优先</option>
                                 <option value="dateAsc">日期: 最早优先</option>
@@ -519,23 +519,23 @@
                             </select>
                         </div>
                         <div class="flex items-center space-x-2 bg-white px-4 py-3 rounded-2xl shadow-sm border border-slate-100">
-                            <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">布局</span>
+                            <span class="text-xs font-black text-slate-500 uppercase tracking-widest">布局</span>
                             <select id="transLayoutMode" onchange="renderTrans()" class="bg-transparent outline-none font-black text-xs text-indigo-600 flex-1">
                                 <option value="single">单列时间线</option>
                                 <option value="double">双列分流对比</option>
                             </select>
                         </div>
                         <div class="flex items-center space-x-2 bg-white px-4 py-3 rounded-2xl shadow-sm border border-slate-100">
-                            <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">从</span>
+                            <span class="text-xs font-black text-slate-500 uppercase tracking-widest">从</span>
                             <input type="date" id="transStartDate" onchange="renderTrans()" class="bg-transparent outline-none font-bold text-xs text-indigo-600 flex-1">
                         </div>
                         <div class="flex items-center space-x-2 bg-white px-4 py-3 rounded-2xl shadow-sm border border-slate-100">
-                            <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">至</span>
+                            <span class="text-xs font-black text-slate-500 uppercase tracking-widest">至</span>
                             <input type="date" id="transEndDate" onchange="renderTrans()" class="bg-transparent outline-none font-bold text-xs text-indigo-600 flex-1">
                         </div>
                         <div class="flex items-center justify-center space-x-3 bg-white px-4 py-3 rounded-2xl shadow-sm border border-slate-100">
-                            <button onclick="clearTransDateFilter()" class="text-[9px] font-black text-slate-400 hover:text-indigo-600 transition-colors">清除</button>
-                            <button onclick="exportTransCSV()" class="text-[10px] font-black text-emerald-600 flex items-center"><i data-lucide="file-spreadsheet" class="w-3 h-3 mr-1"></i>CSV</button>
+                            <button onclick="clearTransDateFilter()" class="text-xs font-black text-slate-500 hover:text-indigo-600 transition-colors">清除</button>
+                            <button onclick="exportTransCSV()" class="text-xs font-black text-emerald-600 flex items-center"><i data-lucide="file-spreadsheet" class="w-3 h-3 mr-1"></i>CSV</button>
                         </div>
                     </div>
 
@@ -588,7 +588,7 @@
                             </div>
                             <div class="space-y-4">
                                 <div>
-                                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 px-1">当前显示姓名</label>
+                                    <label class="text-xs font-black text-slate-600 uppercase tracking-widest block mb-2 px-1">当前显示姓名</label>
                                     <input type="text" id="settingNewUsername" class="w-full bg-slate-50/80 border border-slate-100 p-4 md:p-5 rounded-[22px] font-black outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all text-lg text-slate-700 placeholder:text-slate-300" autocomplete="off">
                                 </div>
                                 <button onclick="updateProfile(true)" class="w-full bg-gradient-to-r from-slate-800 to-slate-900 text-white py-4 md:py-5 rounded-[22px] font-black shadow-xl shadow-slate-300/30 active:scale-95 transition-all">同步更新档案</button>
@@ -622,10 +622,10 @@
                                     <table class="w-full text-left border-collapse min-w-[600px]">
                                         <thead class="bg-slate-50/50">
                                             <tr>
-                                                <th class="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">用户信息</th>
-                                                <th class="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">权限级别</th>
-                                                <th class="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">预留手机</th>
-                                                <th class="p-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">权限操作</th>
+                                                <th class="p-6 text-xs font-black text-slate-600 uppercase tracking-widest">用户信息</th>
+                                                <th class="p-6 text-xs font-black text-slate-600 uppercase tracking-widest">权限级别</th>
+                                                <th class="p-6 text-xs font-black text-slate-600 uppercase tracking-widest">预留手机</th>
+                                                <th class="p-6 text-right text-xs font-black text-slate-600 uppercase tracking-widest">权限操作</th>
                                             </tr>
                                         </thead>
                                         <tbody id="userListTable" class="divide-y divide-slate-50"></tbody>
@@ -1046,11 +1046,11 @@
                 getEl('invTable').innerHTML = filtered.map(p => {
                     const fact = allFactories.find(f => f.id === p.factoryId); const isAdmin = currentUser.role !== 'staff';
                     const actBtns = isAdmin ? `<div class="flex space-x-2 mt-2"><button onclick="event.stopPropagation(); openEditModal('${p.id}')" class="p-2 text-indigo-400 hover:bg-indigo-50 rounded-lg transition-colors"><i data-lucide="edit-3" class="w-4 h-4"></i></button><button onclick="event.stopPropagation(); doDeleteProduct('${p.id}')" class="p-2 text-rose-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>` : '';
-                    const catTag = `<span class="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md text-[9px] font-black uppercase border border-indigo-100">${esc(p.category || '默认')}</span>`;
-                    const specTag = p.spec ? `<span class="px-2 py-0.5 bg-slate-50 text-slate-500 rounded-md text-[9px] font-black border border-slate-200 mt-1 block truncate max-w-[100px]">${esc(p.spec)}</span>` : '';
-                    const matTag = p.material ? `<span class="px-2 py-0.5 bg-slate-50 text-slate-400 rounded-md text-[9px] font-black border border-slate-200 mt-1 block truncate max-w-[100px]">${esc(p.material)}</span>` : '';
-                    const custTag = p.customerName ? `<span class="px-2 py-0.5 bg-slate-100 text-slate-400 rounded-md text-[9px] font-black border border-slate-200 mt-1 block truncate max-w-[100px]">${esc(p.customerName)}</span>` : '';
-                    const factTag = fact ? `<span class="px-2 py-0.5 bg-amber-50 text-amber-600 rounded-md text-[9px] font-black border border-amber-100 mt-1 block truncate max-w-[100px]">${esc(fact.name)}</span>` : '';
+                    const catTag = `<span class="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md text-xs font-black uppercase border border-indigo-100">${esc(p.category || '默认')}</span>`;
+                    const specTag = p.spec ? `<span class="px-2 py-0.5 bg-slate-50 text-slate-600 rounded-md text-xs font-black border border-slate-200 mt-1 block truncate max-w-[100px]">${esc(p.spec)}</span>` : '';
+                    const matTag = p.material ? `<span class="px-2 py-0.5 bg-slate-50 text-slate-600 rounded-md text-xs font-black border border-slate-200 mt-1 block truncate max-w-[100px]">${esc(p.material)}</span>` : '';
+                    const custTag = p.customerName ? `<span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-xs font-black border border-slate-200 mt-1 block truncate max-w-[100px]">${esc(p.customerName)}</span>` : '';
+                    const factTag = fact ? `<span class="px-2 py-0.5 bg-amber-50 text-amber-600 rounded-md text-xs font-black border border-amber-100 mt-1 block truncate max-w-[100px]">${esc(fact.name)}</span>` : '';
                     return `<tr class="hover:bg-slate-50 transition-all clickable-row group" onclick="showInvDetail('${p.id}')">
                         <td class="p-8">
                             <div class="flex items-center space-x-4">
@@ -1059,19 +1059,19 @@
                                 </div>
                                 <div class="min-w-0">
                                     <div class="font-black text-sm text-slate-800 truncate">${esc(p.name)}</div>
-                                    <div class="text-[10px] text-slate-300 font-mono tracking-widest uppercase truncate">${esc(p.sku)}</div>
-                                    ${p.notes ? `<div class="text-[9px] text-amber-600 font-black mt-1 truncate max-w-[150px] italic bg-amber-50 px-1 rounded-sm">备注: ${esc(p.notes)}</div>` : ''}
+                                    <div class="text-xs text-slate-500 font-mono tracking-widest uppercase truncate">${esc(p.sku)}</div>
+                                    ${p.notes ? `<div class="text-xs text-amber-700 font-black mt-1 truncate max-w-[150px] italic bg-amber-50 px-1 rounded-sm">备注: ${esc(p.notes)}</div>` : ''}
                                     ${actBtns}
                                 </div>
                             </div>
                         </td>
                         <td class="p-8 text-center"><div class="flex flex-col items-center">${catTag}${specTag}${matTag}</div></td>
                         <td class="p-8 text-center"><div class="flex flex-col items-center">${custTag}${factTag}</div></td>
-                        <td class="p-8 text-center"><div class="space-y-1"><div class="text-sm font-bold text-slate-400 uppercase tracking-tighter">${formatMoney(p.unitPrice, p.currency)} <span class="opacity-30">(${esc(p.currency)})</span></div><div class="text-2xl md:text-3xl font-black text-slate-900 tracking-tighter">${p.balance} <span class="text-[10px] uppercase opacity-30 font-bold">Bags</span></div></div></td>
+                        <td class="p-8 text-center"><div class="space-y-1"><div class="text-sm font-bold text-slate-600 uppercase tracking-tighter">${formatMoney(p.unitPrice, p.currency)} <span class="opacity-30">(${esc(p.currency)})</span></div><div class="text-2xl md:text-3xl font-black text-slate-900 tracking-tighter">${p.balance} <span class="text-xs uppercase opacity-50 font-bold">Bags</span></div></div></td>
                         <td class="p-8 text-center">
                             <div class="space-y-1">
                                 <div class="text-xs font-black text-indigo-600 uppercase tracking-widest">${esc(p.lastOperator)}</div>
-                                <div class="text-[9px] text-slate-300 font-bold">${p.lastDate ? new Date(p.lastDate).toLocaleDateString() : '尚未出入库'}</div>
+                                <div class="text-xs text-slate-500 font-bold">${p.lastDate ? new Date(p.lastDate).toLocaleDateString() : '尚未出入库'}</div>
                             </div>
                         </td>
                         <td class="p-8 text-right font-black text-lg xl:text-2xl text-emerald-600 tracking-tighter tabular-nums whitespace-nowrap overflow-hidden text-ellipsis">${formatMoney(p.balance * p.unitPrice, p.currency)}</td>
@@ -1084,10 +1084,10 @@
                     // 移动端管理操作条
                     const mobileActBtns = isAdmin ? `
                     <div class="flex items-center space-x-2 pt-3 border-t border-slate-50 mt-2">
-                        <button onclick="event.stopPropagation(); openEditModal('${p.id}')" class="flex-1 flex items-center justify-center space-x-2 py-3 bg-indigo-50 text-indigo-600 rounded-xl font-black text-[10px] active:scale-95 transition-all">
+                        <button onclick="event.stopPropagation(); openEditModal('${p.id}')" class="flex-1 flex items-center justify-center space-x-2 py-3 bg-indigo-50 text-indigo-600 rounded-xl font-black text-xs active:scale-95 transition-all">
                             <i data-lucide="edit-3" class="w-3 h-3"></i><span>修改档案</span>
                         </button>
-                        <button onclick="event.stopPropagation(); doDeleteProduct('${p.id}')" class="flex-1 flex items-center justify-center space-x-2 py-3 bg-rose-50 text-rose-500 rounded-xl font-black text-[10px] active:scale-95 transition-all">
+                        <button onclick="event.stopPropagation(); doDeleteProduct('${p.id}')" class="flex-1 flex items-center justify-center space-x-2 py-3 bg-rose-50 text-rose-500 rounded-xl font-black text-xs active:scale-95 transition-all">
                             <i data-lucide="trash-2" class="w-3 h-3"></i><span>彻底删除</span>
                         </button>
                     </div>` : '';
@@ -1101,20 +1101,20 @@
                                 </div>
                                 <div class="min-w-0">
                                     <div class="font-black text-slate-800 text-lg leading-tight truncate">${esc(p.name)}</div>
-                                    <div class="text-[10px] text-slate-300 font-mono mt-1 uppercase tracking-widest">${esc(p.sku)}</div>
-                                    ${p.notes ? `<div class="text-[9px] text-amber-600 font-black mt-1 truncate max-w-[150px] italic bg-amber-50 px-1 rounded-sm">备注: ${esc(p.notes)}</div>` : ''}
+                                    <div class="text-xs text-slate-500 font-mono mt-1 uppercase tracking-widest">${esc(p.sku)}</div>
+                                    ${p.notes ? `<div class="text-xs text-amber-700 font-black mt-1 truncate max-w-[150px] italic bg-amber-50 px-1 rounded-sm">备注: ${esc(p.notes)}</div>` : ''}
                                 </div>
                             </div>
                             <div class="text-right flex-shrink-0 min-w-[80px]">
                                 <div class="text-xl font-black text-emerald-600 tracking-tighter">${formatMoney(p.balance * p.unitPrice, p.currency)}</div>
-                                <div class="text-[9px] font-black text-slate-300 uppercase tracking-widest mt-0.5">资产估值</div>
+                                <div class="text-xs font-black text-slate-500 uppercase tracking-widest mt-0.5">资产估值</div>
                             </div>
                         </div>
                         <div class="flex flex-wrap gap-2 pt-2 border-t border-slate-50">
-                            <span class="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[9px] font-black uppercase border border-indigo-100">${esc(p.category || '默认')}</span>
-                            ${p.spec ? `<span class="px-2 py-1 bg-slate-50 text-slate-400 rounded-lg text-[9px] font-black border border-slate-100">${esc(p.spec)}</span>` : ''}
-                            <span class="px-2 py-1 bg-amber-50 text-amber-600 rounded-lg text-[9px] font-black border border-amber-100">${esc(fact ? fact.name : '未指派')}</span>
-                            <span class="ml-auto text-sm font-black text-slate-900">库存: ${p.balance} <span class="text-[9px] text-slate-300 uppercase">Bags</span></span>
+                            <span class="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-black uppercase border border-indigo-100">${esc(p.category || '默认')}</span>
+                            ${p.spec ? `<span class="px-2 py-1 bg-slate-50 text-slate-600 rounded-lg text-xs font-black border border-slate-100">${esc(p.spec)}</span>` : ''}
+                            <span class="px-2 py-1 bg-amber-50 text-amber-600 rounded-lg text-xs font-black border border-amber-100">${esc(fact ? fact.name : '未指派')}</span>
+                            <span class="ml-auto text-sm font-black text-slate-900">库存: ${p.balance} <span class="text-xs text-slate-500 uppercase">Bags</span></span>
                         </div>
                         ${mobileActBtns}
                     </div>`;
@@ -1156,10 +1156,10 @@
                 const createCardHtml = (t) => {
                     const p = products.find(x => x.id === t.productId), isIn = t.type === 'in';
                     const isAdmin = currentUser.role === 'admin' || currentUser.role === 'manager';
-                    const customerTag = t.customerName ? `<span class="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md text-[9px] font-black border border-indigo-100/50 mr-2">${isIn?'来源':'去向'}: ${esc(t.customerName)}</span>` : '';
-                    const receiverTag = (!isIn && t.receiver) ? `<span class="px-2 py-0.5 bg-amber-50 text-amber-600 rounded-md text-[9px] font-black border border-amber-100/50 mr-2"><i data-lucide="user-check" class="w-2 h-2 inline mr-1"></i>领用: ${esc(t.receiver)}</span>` : '';
-                    const batchTag = t.batchNo ? `<span class="px-2 py-0.5 bg-slate-50 text-slate-500 rounded-md text-[9px] font-black border border-slate-200/50 mr-2">批次: ${esc(t.batchNo)}</span>` : '';
-                    const operatorTag = `<span class="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-md text-[9px] font-black border border-slate-200"><i data-lucide="user" class="w-2 h-2 inline mr-1"></i>经办: ${esc(t.username)}</span>`;
+                    const customerTag = t.customerName ? `<span class="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md text-xs font-black border border-indigo-100/50 mr-2">${isIn?'来源':'去向'}: ${esc(t.customerName)}</span>` : '';
+                    const receiverTag = (!isIn && t.receiver) ? `<span class="px-2 py-0.5 bg-amber-50 text-amber-600 rounded-md text-xs font-black border border-amber-100/50 mr-2"><i data-lucide="user-check" class="w-2 h-2 inline mr-1"></i>领用: ${esc(t.receiver)}</span>` : '';
+                    const batchTag = t.batchNo ? `<span class="px-2 py-0.5 bg-slate-50 text-slate-600 rounded-md text-xs font-black border border-slate-200/50 mr-2">批次: ${esc(t.batchNo)}</span>` : '';
+                    const operatorTag = `<span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-xs font-black border border-slate-200"><i data-lucide="user" class="w-2 h-2 inline mr-1"></i>经办: ${esc(t.username)}</span>`;
                     const imgPreview = t.image ? `<img src="${esc(t.image)}" class="w-16 h-16 md:w-20 md:h-20 rounded-2xl object-cover shadow-lg border-2 border-white cursor-zoom-in flex-shrink-0" onclick="event.stopPropagation(); previewImg(this.src)">` : `<div class="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-300 border-2 border-dashed border-slate-200 flex-shrink-0"><i data-lucide="image" class="w-6 h-6"></i></div>`;
                     const delBtn = isAdmin ? `<button onclick="event.stopPropagation(); doDeleteTrans('${t.id}')" class="p-2.5 bg-rose-50 text-rose-400 rounded-xl active:scale-90 transition-all hover:bg-rose-100"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : '';
                     
@@ -1168,13 +1168,13 @@
                         ${imgPreview}
                         <div class="flex-1 min-w-0">
                             <div class="flex flex-wrap items-center gap-2 mb-1">
-                                <span class="text-[8px] font-black text-slate-300 tracking-widest uppercase">${new Date(t.date).toLocaleDateString()}</span>
+                                <span class="text-xs font-black text-slate-500 tracking-widest uppercase">${new Date(t.date).toLocaleDateString()}</span>
                                 ${customerTag}${receiverTag}${batchTag}${operatorTag}
                             </div>
-                            <h4 class="text-sm md:text-lg font-black truncate text-slate-800 tracking-tighter">${p ? p.name : '已删'}</h4>
+                            <h4 class="text-base md:text-lg font-black truncate text-slate-800 tracking-tighter">${p ? p.name : '已删'}</h4>
                             <div class="flex items-center justify-between mt-2">
                                 <div class="text-xs font-black text-slate-900">${formatMoney(t.quantity * (p?.unitPrice || 0), p?.currency)}</div>
-                                <div class="text-[10px] font-black ${isIn ? 'text-emerald-600' : 'text-rose-600'}">${isIn ? '+' : '-'}${t.quantity} Bags</div>
+                                <div class="text-sm font-black ${isIn ? 'text-emerald-600' : 'text-rose-600'}">${isIn ? '+' : '-'}${t.quantity} Bags</div>
                             </div>
                         </div>
                         ${delBtn}
@@ -1192,8 +1192,8 @@
                     getEl('inCountTag').innerText = inData.length;
                     getEl('outCountTag').innerText = outData.length;
                     
-                    getEl('transInList').innerHTML = inData.length ? inData.map(createCardHtml).join('') : '<p class="text-center text-[10px] text-slate-300 py-10 font-bold uppercase tracking-widest">暂无入库数据</p>';
-                    getEl('transOutList').innerHTML = outData.length ? outData.map(createCardHtml).join('') : '<p class="text-center text-[10px] text-slate-300 py-10 font-bold uppercase tracking-widest">暂无出库数据</p>';
+                    getEl('transInList').innerHTML = inData.length ? inData.map(createCardHtml).join('') : '<p class="text-center text-xs text-slate-500 py-10 font-bold uppercase tracking-widest">暂无入库数据</p>';
+                    getEl('transOutList').innerHTML = outData.length ? outData.map(createCardHtml).join('') : '<p class="text-center text-xs text-slate-500 py-10 font-bold uppercase tracking-widest">暂无出库数据</p>';
                 } else {
                     getEl('transList').classList.remove('hidden');
                     getEl('transDoubleContainer').classList.add('hidden');
@@ -1530,14 +1530,14 @@
                     <div class="flex-1 min-w-0">
                         <div class="flex justify-between items-center mb-1">
                             <span class="text-[10px] font-black uppercase tracking-widest ${isIn?'text-emerald-600':'text-rose-600'}">${isIn?'入库记录':'发货出库'}</span>
-                            <span class="text-[9px] font-bold text-slate-300">${new Date(t.date).toLocaleString()}</span>
+                            <span class="text-xs font-bold text-slate-500">${new Date(t.date).toLocaleString()}</span>
                         </div>
                         <div class="flex items-center justify-between">
                             <p class="font-black text-slate-700 text-sm">${isIn?'+':'-'}${t.quantity} <span class="text-[10px] opacity-40">Bags</span></p>
                             <p class="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">${esc(t.username)}</p>
                         </div>
-                        ${t.customerName ? `<p class="text-[9px] font-bold text-slate-400 mt-1">📍 ${isIn?'来源':'去向'}: ${esc(t.customerName)}</p>` : ''}
-                        ${t.notes ? `<p class="text-[9px] italic text-slate-400 mt-1 truncate">"${esc(t.notes)}"</p>` : ''}
+                        ${t.customerName ? `<p class="text-xs font-bold text-slate-500 mt-1">📍 ${isIn?'来源':'去向'}: ${esc(t.customerName)}</p>` : ''}
+                        ${t.notes ? `<p class="text-xs italic text-slate-500 mt-1 truncate">"${esc(t.notes)}"</p>` : ''}
                     </div>
                 </div>`;
             }).join('') : '<div class="py-10 text-center text-slate-300 font-bold text-xs uppercase tracking-[0.2em]">该货物尚未产生流转记录</div>';
@@ -1605,7 +1605,7 @@
                     </div>
                     <div class="flex items-center gap-6 p-6 bg-slate-50 rounded-[32px] border border-slate-100">
                         <img src="${esc(p?.image||'')}" class="w-20 h-20 rounded-2xl object-cover shadow-lg border-2 border-white" onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27150%27 height=%27150%27 viewBox=%270 0 150 150%27%3E%3Crect fill=%27%23f1f5f9%27 width=%27150%27 height=%27150%27/%3E%3Ctext x=%2775%27 y=%2780%27 text-anchor=%27middle%27 fill=%27%2394a3b8%27 font-size=%2712%27 font-family=%27sans-serif%27%3EN/A%3C/text%3E%3C/svg%3E'">
-                        <div class="min-w-0"><p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">关联产品档案</p><h4 class="text-2xl font-black text-slate-800 tracking-tighter truncate">${p ? p.name : '产品已被移除'}</h4><p class="text-xs font-mono text-slate-400 tracking-widest">${p?.sku || 'UNKNOWN'}</p></div>
+                        <div class="min-w-0"><p class="text-xs font-black text-slate-500 uppercase tracking-widest">关联产品档案</p><h4 class="text-2xl font-black text-slate-800 tracking-tighter truncate">${p ? p.name : '产品已被移除'}</h4><p class="text-xs font-mono text-slate-400 tracking-widest">${p?.sku || 'UNKNOWN'}</p></div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="glass-card p-8 shadow-sm flex justify-between items-center">
@@ -1686,7 +1686,7 @@
                         </div>
                         <div class="text-right">
                             <p class="text-2xl font-black text-rose-600">${p.balance}</p>
-                            <p class="text-[9px] text-rose-400 font-black">剩余库存</p>
+                            <p class="text-xs text-rose-500 font-black">剩余库存</p>
                         </div>
                     </div>
                 `).join('');
