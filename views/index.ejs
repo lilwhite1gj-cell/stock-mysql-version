@@ -223,6 +223,103 @@
             #statCards .text-3xl { font-size: 0.875rem !important; }
             .chart-doughnut-wrap { max-width: 240px; }
         }
+
+        /* ============================================================
+           以下为 UI 全面优化增强（可读性 / 响应式 / 动效 / 无障碍）
+           仅调整视觉与体验，不改动任何交互逻辑与功能
+           ============================================================ */
+
+        /* ---------- 1. 可读性 & 对比度 ---------- */
+        :root {
+            --c-text: #1e293b;        /* slate-800 正文 */
+            --c-text-soft: #475569;   /* slate-600 次级 */
+            --c-text-muted: #64748b;  /* 提亮后的 slate-400/500 辅助文字 */
+            --c-primary: #6366f1;
+            --focus-ring: #6366f1;
+        }
+        /* 提升正文最小字号与行高（不影响 Tailwind 间距体系） */
+        .text-base { font-size: 16px !important; line-height: 1.6 !important; }
+        .text-sm   { font-size: 14.5px !important; line-height: 1.55 !important; }
+        .text-xs   { font-size: 13px !important; line-height: 1.5 !important; }
+        /* 浅色背景上 slate-400/500 原对比度不足，整体提亮 */
+        .text-slate-400 { color: #64748b !important; }
+        .text-slate-500 { color: #475569 !important; }
+        .text-slate-300 { color: #94a3b8 !important; }
+        /* 表单占位符即“字段标签”，提升字号与对比度 */
+        input::placeholder, textarea::placeholder, select::placeholder {
+            color: #64748b !important; opacity: 1; font-size: 15px;
+        }
+        /* 表单控件基础字号（桌面端 ≥15px，移动端保持 16px） */
+        input, select, textarea {
+            font-size: 15px;
+            transition: box-shadow .2s ease, background-color .2s ease, border-color .2s ease;
+        }
+        /* 键盘聚焦可见反馈（可访问性） */
+        input:focus-visible, select:focus-visible, textarea:focus-visible,
+        button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
+            outline: 2px solid var(--focus-ring); outline-offset: 2px;
+        }
+
+        /* ---------- 2. 交互过渡 & 触感反馈 ---------- */
+        button, .btn, [role="button"] {
+            transition: transform .15s cubic-bezier(0.16, 1, 0.3, 1),
+                        box-shadow .2s ease, background-color .2s ease,
+                        color .2s ease, filter .2s ease;
+        }
+        button:active:not(:disabled) { transform: scale(0.97); }
+        /* 表单提交 / 保存按钮加载态（配合 JS 添加 .btn-loading 即可显示转圈） */
+        .btn-loading { position: relative; pointer-events: none; opacity: .85; }
+        .btn-loading::after {
+            content: ''; position: absolute; right: 18px; top: 50%; width: 18px; height: 18px;
+            margin-top: -9px; border: 2px solid rgba(255,255,255,.45); border-top-color: #fff;
+            border-radius: 50%; animation: btnSpin .7s linear infinite;
+        }
+        @keyframes btnSpin { to { transform: rotate(360deg); } }
+
+        /* ---------- 3. 桌面端 / 平板端 布局 ---------- */
+        @media (min-width: 1024px) {
+            #mainContainer { max-width: 1440px; margin: 0 auto; width: 100%; }
+        }
+        @media (min-width: 768px) and (max-width: 1023px) {
+            #mainContainer { padding: 1.75rem; }
+            #statCards { gap: 1rem; }
+        }
+
+        /* ---------- 4. 弹窗入场动画（桌面端；移动端沿用 slideUp） ---------- */
+        @media (min-width: 769px) {
+            .modal-drawer { animation: modalPop .26s cubic-bezier(0.16, 1, 0.3, 1); }
+        }
+        @keyframes modalPop {
+            from { opacity: 0; transform: scale(.96) translateY(10px); }
+            to   { opacity: 1; transform: none; }
+        }
+        /* 遮罩淡入 */
+        .fixed.inset-0[class*="bg-slate-900/70"] { animation: overlayIn .2s ease; }
+        @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* ---------- 5. 更新日志可读性 ---------- */
+        #changelogContent { font-size: 15px; line-height: 1.85; color: var(--c-text); }
+        #changelogContent .font-black.text-slate-800 { font-size: 17px; color: #1e293b; }
+        #changelogContent li { font-size: 14.5px; color: #475569; line-height: 1.7; }
+        #changelogContent .text-\[10px\] { font-size: 12px !important; color: #64748b !important; }
+        #changelogContent ul { list-style: none; padding-left: 0; }
+        #changelogContent li::before {
+            content: '•'; color: #c7d2fe; font-weight: 900; margin-right: 8px;
+        }
+
+        /* ---------- 6. 防止横向溢出 ---------- */
+        html { overflow-x: hidden; }
+        img, svg, canvas { max-width: 100%; }
+
+        /* ---------- 7. 尊重“减少动效”偏好（无障碍） ---------- */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: .001ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: .001ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
     </style>
 </head>
 
