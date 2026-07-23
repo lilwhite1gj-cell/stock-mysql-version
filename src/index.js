@@ -154,10 +154,6 @@ app.get('/api/health', async (req, res) => {
     mysqlInitError: mysqlInitError || undefined,
     mysqlHost: process.env.MYSQL_HOST || '未配置',
     mysqlDatabase: process.env.MYSQL_DATABASE || '未配置',
-    // 诊断：仅暴露密码长度与是否以 # 结尾（不泄露密码内容），用于确认特殊字符是否被启动器吞掉
-    mysqlPasswordLength: (process.env.MYSQL_PASSWORD || '').length,
-    mysqlPasswordEndsWithHash: (process.env.MYSQL_PASSWORD || '').endsWith('#'),
-    mysqlPasswordAllAlnum: /^[A-Za-z0-9]+$/.test(process.env.MYSQL_PASSWORD || ''),
     envLoaded: !!process.env.JWT_SECRET,
     nodeEnv: process.env.NODE_ENV || '未设置',
     dataDir: fs.existsSync(path.join(__dirname, '../data')) ? '存在' : '不存在',
