@@ -64,7 +64,11 @@ const getLocalData = () => {
     };
   } catch (e) { return { users: [], products: [], transactions: [], categories: ['嘴贴', '鼻贴', '样品'], factories: [], customers: [] }; }
 };
-const saveLocalData = (data) => { fs.writeFileSync(dbPath, JSON.stringify(data, null, 2)); };
+const saveLocalData = (data) => {
+  const dir = path.dirname(dbPath);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
+};
 
 // --- MySQL 数据库连接 (MySQL优先，JSON备选) ---
 const mysqlInitPromise = process.env.MYSQL_HOST
@@ -166,6 +170,32 @@ app.get('/api/categories', async (req, res) => {
   }
 });
 
+// --- 诊断端点（生产环境排查用） ---
+app.get('/api/health', async (req, res) => {
+  const info = {
+    version: pkgVersion,
+    nodeVersion: process.version,
+    dbMode: useMySQL ? 'MySQL' : (process.env.MYSQL_HOST ? 'Local JSON (MySQL连接失败)' : 'Local JSON (未配置MYSQL_HOST)'),
+    mysqlReady,
+    mysqlHost: process.env.MYSQL_HOST ? '已配置' : '未配置',
+    mysqlDatabase: process.env.MYSQL_DATABASE ? '已配置' : '未配置',
+    envLoaded: !!process.env.JWT_SECRET,
+    dataDir: fs.existsSync(path.join(__dirname, '../data')) ? '存在' : '不存在',
+    dbFile: fs.existsSync(dbPath) ? '存在' : '不存在',
+  };
+  if (useMySQL) {
+    try {
+      const [rows] = await (await getPool()).query('SELECT COUNT(*) as cnt FROM users');
+      info.mysqlUserCount = rows[0].cnt;
+    } catch (e) {
+      info.mysqlError = e.message;
+    }
+  } else {
+    info.localUserCount = getLocalData().users.length;
+  }
+  res.json(info);
+});
+
 // --- API 核心逻辑 ---
 app.post('/api/register', async (req, res) => {
   const { username, password, phone, question, answer } = req.body;
@@ -196,12 +226,17 @@ app.post('/api/register', async (req, res) => {
       return res.status(400).json({ message: '注册失败，请稍后重试' });
     }
   } else {
-    const db = getLocalData();
-    if (db.users.find(u => u.username === username)) return res.status(400).json({ message: '用户名已存在' });
-    const userData = { id: Date.now().toString(), username, password: hashedPassword, role: defaultRole, phone: phone || '', securityQuestion: question || '', securityAnswer: answer || '' };
-    db.users.push(userData);
-    saveLocalData(db);
-    res.json({ message: 'Success' });
+    try {
+      const db = getLocalData();
+      if (db.users.find(u => u.username === username)) return res.status(400).json({ message: '用户名已存在' });
+      const userData = { id: Date.now().toString(), username, password: hashedPassword, role: defaultRole, phone: phone || '', securityQuestion: question || '', securityAnswer: answer || '' };
+      db.users.push(userData);
+      saveLocalData(db);
+      res.json({ message: 'Success' });
+    } catch (e) {
+      console.error('注册写入失败:', e.message);
+      return res.status(500).json({ message: '注册失败，服务器存储错误: ' + e.message });
+    }
   }
 });
 
