@@ -16,6 +16,14 @@ import { getPool, initDatabase, queryRows, queryRow, execute } from './db-mysql.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '../.env') });
+
+// JWT 密钥：禁止 fallback 到弱密钥，未配置则直接退出，避免认证形同虚设
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('❌ FATAL: 环境变量 JWT_SECRET 未配置，认证服务不可用，进程退出');
+  process.exit(1);
+}
+
 const app = express();
 
 // 隐藏技术栈标识
@@ -111,9 +119,10 @@ const upload = multer({
 
 // --- Auth 中间件 ---
 const authenticate = (req, res, next) => {
+  if (!JWT_SECRET) return res.status(500).json({ message: 'Server auth misconfigured' });
   const h = req.headers.authorization;
   if (!h) return res.status(401).json({ message: 'No Token' });
-  jwt.verify(h.split(' ')[1], process.env.JWT_SECRET || 'secret', (err, user) => {
+  jwt.verify(h.split(' ')[1], JWT_SECRET, (err, user) => {
     if (err) return res.status(403).json({ message: 'Invalid Token' });
     req.user = user; next();
   });
@@ -139,8 +148,28 @@ function makeLimiter(max, windowMs) {
 const limLogin = makeLimiter(10, 60 * 1000);   // 登录：每分钟 10 次
 const limReset = makeLimiter(5, 60 * 1000);    // 找回/重置密码：每分钟 5 次
 
-// --- 健康检查端点（诊断数据库连接状态） ---
+// 定期清理过期限流桶，防止长期运行内存泄漏（不阻止进程退出）
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, b] of _rateBuckets.entries()) {
+    if (now - b.start > 60 * 1000) _rateBuckets.delete(key);
+  }
+}, 5 * 60 * 1000).unref();
+
+// --- 健康检查端点 ---
+// 公开端点：仅供外部探活与基础状态，不暴露任何敏感信息
 app.get('/api/health', async (req, res) => {
+  res.json({
+    status: 'ok',
+    version: pkgVersion,
+    dbMode: useMySQL ? 'MySQL' : (process.env.MYSQL_HOST ? 'Local JSON (MySQL连接失败)' : 'Local JSON (未配置MYSQL_HOST)'),
+    mysqlReady,
+    uptime: process.uptime()
+  });
+});
+
+// 详细诊断端点：需认证，承载敏感信息（目录、连接详情、用户数等）
+app.get('/api/health/diag', authenticate, async (req, res) => {
   const envPath = path.join(__dirname, '../.env');
   const info = {
     version: pkgVersion,

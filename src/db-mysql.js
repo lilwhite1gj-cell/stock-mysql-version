@@ -88,7 +88,8 @@ export async function initDatabase() {
     { table: 'transactions', col: 'batch_no', def: 'VARCHAR(100)' }
   ];
   for (const { table, col, def } of alterColumns) {
-    try { await db.query(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`); } catch (e) { if (e.code !== 'ER_DUP_FIELDNAME') throw e; }
+    // 表名/列名用 ?? 占位符转义（防注入）；def 是硬编码数据类型，直接拼接
+    try { await db.query('ALTER TABLE ?? ADD COLUMN ?? ' + def, [table, col]); } catch (e) { if (e.code !== 'ER_DUP_FIELDNAME') throw e; }
   }
 
   await db.query(`
