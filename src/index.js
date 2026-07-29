@@ -11,6 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { getPool, initDatabase, queryRows, queryRow, execute } from './db-mysql.js';
+import { computeBalance, requireAdmin, requireNonStaff, sendCsv } from './helpers.js';
 
 // 先解析 __dirname，再加载 .env（确保 Passenger 等非标准 CWD 环境也能找到配置）
 const __filename = fileURLToPath(import.meta.url);
@@ -126,6 +127,14 @@ const authenticate = (req, res, next) => {
     req.user = user; next();
   });
 };
+
+// --- 公共查询助手（消除按用户名查用户的重复逻辑） ---
+async function findUserByUsername(username) {
+  if (useMySQL) {
+    return await queryRow('SELECT * FROM users WHERE username = ?', [username]);
+  }
+  return getLocalData().users.find(u => u.username === username);
+}
 
 // --- 简单内存限流（防止暴力破解 / 账号枚举），无需额外依赖 ---
 const _rateBuckets = new Map();
@@ -274,12 +283,7 @@ app.post('/api/register', async (req, res) => {
 
 app.post('/api/login', limLogin, async (req, res) => {
   const { username, password } = req.body;
-  let user;
-  if (useMySQL) {
-    user = await queryRow('SELECT * FROM users WHERE username = ?', [username]);
-  } else {
-    user = getLocalData().users.find(u => u.username === username);
-  }
+  const user = await findUserByUsername(username);
   if (!user || !(await bcrypt.compare(password, user.password))) return res.status(401).json({ message: '账号或密码错误' });
   const id = String(user.id);
   const token = jwt.sign({ id, username: user.username, role: user.role }, JWT_SECRET);
@@ -288,24 +292,14 @@ app.post('/api/login', limLogin, async (req, res) => {
 
 app.get('/api/forgot-password-verify', limReset, async (req, res) => {
   const { username } = req.query;
-  let user;
-  if (useMySQL) {
-    user = await queryRow('SELECT security_question FROM users WHERE username = ?', [username]);
-  } else {
-    user = getLocalData().users.find(u => u.username === username);
-  }
+  const user = await findUserByUsername(username);
   if (!user) return res.status(404).json({ message: '用户不存在' });
   res.json({ question: user.securityQuestion || user.security_question });
 });
 
 app.post('/api/reset-password-now', limReset, async (req, res) => {
   const { username, phone, answer, newPassword } = req.body;
-  let user;
-  if (useMySQL) {
-    user = await queryRow('SELECT * FROM users WHERE username = ?', [username]);
-  } else {
-    user = getLocalData().users.find(u => u.username === username);
-  }
+  const user = await findUserByUsername(username);
   if (!user || user.phone !== phone || (user.securityAnswer || user.security_answer) !== answer) return res.status(401).json({ message: '验证信息不匹配' });
   
   const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -333,7 +327,7 @@ app.get('/api/inventory', authenticate, async (req, res) => {
   res.json(products.map(p => {
     const pid = String(p.id);
     const productTrans = transactions.filter(t => String(t.productId || t.product_id) === pid);
-    const balance = productTrans.reduce((s, t) => t.type === 'in' ? s + t.quantity : s - t.quantity, 0);
+    const balance = computeBalance(transactions, pid);
     const lastAction = productTrans[0];
     return { 
       ...p, 
@@ -370,8 +364,7 @@ app.post('/api/products', authenticate, upload.single('image'), async (req, res)
   }
 });
 
-app.put('/api/products/:id', authenticate, upload.single('image'), async (req, res) => {
-  if (req.user.role === 'staff') return res.status(403).json({ message: '无权操作' });
+app.put('/api/products/:id', authenticate, requireNonStaff, upload.single('image'), async (req, res) => {
   const updateData = { ...req.body, unitPrice: parseFloat(req.body.unitPrice || 0) };
   if (req.file) updateData.image = isProduction ? req.file.path : `/uploads/${req.file.filename}`;
   
@@ -399,8 +392,7 @@ app.put('/api/products/:id', authenticate, upload.single('image'), async (req, r
   }
 });
 
-app.delete('/api/products/:id', authenticate, async (req, res) => {
-  if (req.user.role === 'staff') return res.status(403).json({ message: '无权操作' });
+app.delete('/api/products/:id', authenticate, requireNonStaff, async (req, res) => {
   if (useMySQL) {
     const [transRows] = await (await getPool()).query('SELECT COUNT(*) as cnt FROM transactions WHERE product_id = ?', [req.params.id]);
     if (transRows[0].cnt > 0) return res.status(400).json({ message: '已有业务流水记录' });
@@ -485,8 +477,7 @@ app.post('/api/transactions', authenticate, upload.single('transImage'), async (
       // JSON模式：同步校验+写入（单进程无并发问题）
       const db = getLocalData();
       const pid = req.body.productId;
-      const balance = db.transactions.filter(t => t.productId === pid && t.type === 'in').reduce((s, t) => s + t.quantity, 0)
-                   - db.transactions.filter(t => t.productId === pid && t.type === 'out').reduce((s, t) => s + t.quantity, 0);
+      const balance = computeBalance(db.transactions, pid);
       if (quantity > balance) {
         return res.status(400).json({ message: `库存不足！当前库存 ${balance}，出库数量 ${quantity} 超出可用库存` });
       }
@@ -507,8 +498,7 @@ app.post('/api/transactions', authenticate, upload.single('transImage'), async (
   }
 });
 
-app.delete('/api/transactions/:id', authenticate, async (req, res) => {
-  if (req.user.role === 'staff') return res.status(403).json({ message: '无权操作' });
+app.delete('/api/transactions/:id', authenticate, requireNonStaff, async (req, res) => {
   // ===== 删除流水前校验：防止产生负库存 =====
   if (useMySQL) {
     const conn = await (await getPool()).getConnection();
@@ -548,8 +538,7 @@ app.delete('/api/transactions/:id', authenticate, async (req, res) => {
     // 如果是入库记录，检查删除后是否负库存
     if (trans.type === 'in') {
       const pid = trans.productId;
-      const currentBalance = db.transactions.filter(t => t.productId === pid && t.type === 'in').reduce((s, t) => s + t.quantity, 0)
-                            - db.transactions.filter(t => t.productId === pid && t.type === 'out').reduce((s, t) => s + t.quantity, 0);
+      const currentBalance = computeBalance(db.transactions, pid);
       const newBalance = currentBalance - trans.quantity;
       if (newBalance < 0) {
         return res.status(400).json({ message: `无法删除该入库记录！删除后库存将变为 ${newBalance}（负值），当前库存 ${currentBalance}，该入库数量 ${trans.quantity}` });
@@ -571,8 +560,7 @@ app.get('/api/admin/users', authenticate, async (req, res) => {
   }
 });
 
-app.delete('/api/admin/users/:id', authenticate, async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ message: '无权操作' });
+app.delete('/api/admin/users/:id', authenticate, requireAdmin(), async (req, res) => {
   if (req.params.id === req.user.id) return res.status(400).json({ message: '无法删除本人' });
   
   if (useMySQL) {
@@ -591,8 +579,7 @@ app.delete('/api/admin/users/:id', authenticate, async (req, res) => {
   res.json({ message: 'Success' });
 });
 
-app.post('/api/admin/change-role', authenticate, async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ message: '无权操作' });
+app.post('/api/admin/change-role', authenticate, requireAdmin(), async (req, res) => {
   const { userId, newRole } = req.body;
   if (useMySQL) {
     await execute('UPDATE users SET role = ? WHERE id = ?', [newRole, userId]);
@@ -606,8 +593,7 @@ app.post('/api/admin/change-role', authenticate, async (req, res) => {
 });
 
 // 管理员重置指定用户密码（仅超级管理员）
-app.post('/api/admin/reset-password', authenticate, async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ message: '无权操作' });
+app.post('/api/admin/reset-password', authenticate, requireAdmin(), async (req, res) => {
   const { userId, newPassword } = req.body;
   if (!newPassword || String(newPassword).length < 6) return res.status(400).json({ message: '新密码至少6位' });
   try {
@@ -765,7 +751,7 @@ app.get('/api/dashboard-stats', authenticate, async (req, res) => {
 
   const productMix = products.map(p => {
     const pid = String(p.id);
-    const balance = transactions.filter(t => String(t.productId || t.product_id) === pid).reduce((s, t) => t.type === 'in' ? s + t.quantity : s - t.quantity, 0);
+    const balance = computeBalance(transactions, pid);
     return { name: p.name, balance };
   }).sort((a, b) => b.balance - a.balance).slice(0, 7);
 
@@ -829,20 +815,14 @@ app.get('/api/inventory/alerts', authenticate, async (req, res) => {
   }
   const alerts = products.map(p => {
     const pid = String(p.id);
-    const balance = transactions.filter(t => String(t.productId || t.product_id) === pid)
-      .reduce((s, t) => t.type === 'in' ? s + t.quantity : s - t.quantity, 0);
+    const balance = computeBalance(transactions, pid);
     return { ...p, id: pid, balance };
   }).filter(p => p.balance <= threshold && p.balance >= 0).sort((a, b) => a.balance - b.balance);
   res.json(alerts);
 });
 
 // --- CSV 导出 ---
-// CSV 单元格转义：双引号转义 + 防 Excel 公式注入（以 = + - @ 开头时加前缀）
-const csvCell = (v) => {
-  let s = String(v ?? '').replace(/"/g, '""');
-  if (/^[=+\-@]/.test(s)) s = "'" + s;
-  return '"' + s + '"';
-};
+// CSV 单元格转义 sendCsv / csvCell 已抽到 ./helpers.js
 
 app.get('/api/export/inventory', authenticate, async (req, res) => {
   let products, transactions;
@@ -856,16 +836,13 @@ app.get('/api/export/inventory', authenticate, async (req, res) => {
   const rows = products.map(p => {
     const pid = String(p.id);
     const pTrans = transactions.filter(t => String(t.productId || t.product_id) === pid);
-    const balance = pTrans.reduce((s, t) => t.type === 'in' ? s + t.quantity : s - t.quantity, 0);
+    const balance = computeBalance(transactions, pid);
     const totalIn = pTrans.filter(t => t.type === 'in').reduce((s, t) => s + t.quantity, 0);
     const totalOut = pTrans.filter(t => t.type === 'out').reduce((s, t) => s + t.quantity, 0);
     return [p.name, p.sku || '', p.category || '', p.unitPrice || p.unit_price || 0, p.currency || 'CNY', balance, totalIn, totalOut, p.creatorName || p.creator_name || ''];
   });
   const header = '产品名称,货号SKU,品类,单价,币种,当前库存,累计入库,累计出库,创建人';
-  const csv = '\uFEFF' + header + '\n' + rows.map(r => r.map(csvCell).join(',')).join('\n');
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', 'attachment; filename="inventory_' + new Date().toISOString().slice(0, 10) + '.csv"');
-  res.send(csv);
+  sendCsv(res, header, rows);
 });
 
 app.get('/api/export/transactions', authenticate, async (req, res) => {
@@ -884,15 +861,11 @@ app.get('/api/export/transactions', authenticate, async (req, res) => {
     return [d.toLocaleDateString('zh-CN'), d.toLocaleTimeString('zh-CN'), prodMap[String(t.productId || t.product_id)] || '', t.type === 'in' ? '入库' : '出库', t.quantity, t.customerName || t.customer_name || '', t.receiver || '', t.batchNo || t.batch_no || '', t.orderNo || t.order_no || '', t.logisticsNo || t.logistics_no || '', t.username || '', t.notes || ''];
   });
   const header = '日期,时间,产品名称,类型,数量,客户,领用人,批次号,订单号,物流号,操作人,备注';
-  const csv = '\uFEFF' + header + '\n' + rows.map(r => r.map(csvCell).join(',')).join('\n');
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', 'attachment; filename="transactions_' + new Date().toISOString().slice(0, 10) + '.csv"');
-  res.send(csv);
+  sendCsv(res, header, rows);
 });
 
 // --- 数据备份与恢复 ---
-app.get('/api/backup/export', authenticate, async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ message: '仅管理员可操作' });
+app.get('/api/backup/export', authenticate, requireAdmin('仅管理员可操作'), async (req, res) => {
   try {
     let backup;
     if (useMySQL) {
@@ -924,8 +897,7 @@ app.get('/api/backup/export', authenticate, async (req, res) => {
   }
 });
 
-app.post('/api/backup/import', authenticate, async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ message: '仅管理员可操作' });
+app.post('/api/backup/import', authenticate, requireAdmin('仅管理员可操作'), async (req, res) => {
   try {
     const backup = req.body;
     if (!backup || !backup.users || !backup.products) {
