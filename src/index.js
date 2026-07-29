@@ -119,7 +119,6 @@ const upload = multer({
 
 // --- Auth 中间件 ---
 const authenticate = (req, res, next) => {
-  if (!JWT_SECRET) return res.status(500).json({ message: 'Server auth misconfigured' });
   const h = req.headers.authorization;
   if (!h) return res.status(401).json({ message: 'No Token' });
   jwt.verify(h.split(' ')[1], JWT_SECRET, (err, user) => {
@@ -283,7 +282,7 @@ app.post('/api/login', limLogin, async (req, res) => {
   }
   if (!user || !(await bcrypt.compare(password, user.password))) return res.status(401).json({ message: '账号或密码错误' });
   const id = String(user.id);
-  const token = jwt.sign({ id, username: user.username, role: user.role }, process.env.JWT_SECRET || 'secret');
+  const token = jwt.sign({ id, username: user.username, role: user.role }, JWT_SECRET);
   res.json({ token, user: { id, username: user.username, role: user.role } });
 });
 
@@ -372,6 +371,7 @@ app.post('/api/products', authenticate, upload.single('image'), async (req, res)
 });
 
 app.put('/api/products/:id', authenticate, upload.single('image'), async (req, res) => {
+  if (req.user.role === 'staff') return res.status(403).json({ message: '无权操作' });
   const updateData = { ...req.body, unitPrice: parseFloat(req.body.unitPrice || 0) };
   if (req.file) updateData.image = isProduction ? req.file.path : `/uploads/${req.file.filename}`;
   
@@ -400,6 +400,7 @@ app.put('/api/products/:id', authenticate, upload.single('image'), async (req, r
 });
 
 app.delete('/api/products/:id', authenticate, async (req, res) => {
+  if (req.user.role === 'staff') return res.status(403).json({ message: '无权操作' });
   if (useMySQL) {
     const [transRows] = await (await getPool()).query('SELECT COUNT(*) as cnt FROM transactions WHERE product_id = ?', [req.params.id]);
     if (transRows[0].cnt > 0) return res.status(400).json({ message: '已有业务流水记录' });
@@ -507,6 +508,7 @@ app.post('/api/transactions', authenticate, upload.single('transImage'), async (
 });
 
 app.delete('/api/transactions/:id', authenticate, async (req, res) => {
+  if (req.user.role === 'staff') return res.status(403).json({ message: '无权操作' });
   // ===== 删除流水前校验：防止产生负库存 =====
   if (useMySQL) {
     const conn = await (await getPool()).getConnection();
@@ -601,6 +603,29 @@ app.post('/api/admin/change-role', authenticate, async (req, res) => {
     saveLocalData(db);
   }
   res.json({ message: 'Success' });
+});
+
+// 管理员重置指定用户密码（仅超级管理员）
+app.post('/api/admin/reset-password', authenticate, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ message: '无权操作' });
+  const { userId, newPassword } = req.body;
+  if (!newPassword || String(newPassword).length < 6) return res.status(400).json({ message: '新密码至少6位' });
+  try {
+    const hashed = await bcrypt.hash(newPassword, 10);
+    if (useMySQL) {
+      await execute('UPDATE users SET password = ? WHERE id = ?', [hashed, userId]);
+    } else {
+      const db = getLocalData();
+      const idx = db.users.findIndex(u => u.id === userId);
+      if (idx === -1) return res.status(404).json({ message: '用户不存在' });
+      db.users[idx].password = hashed;
+      saveLocalData(db);
+    }
+    res.json({ message: 'Success' });
+  } catch (e) {
+    console.error('重置密码失败:', e.message);
+    res.status(500).json({ message: '重置失败，请稍后重试' });
+  }
 });
 
 app.post('/api/update-profile', authenticate, async (req, res) => {
