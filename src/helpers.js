@@ -10,6 +10,29 @@ export function computeBalance(transactions, productId) {
     .reduce((s, t) => (t.type === 'in' ? s + t.quantity : s - t.quantity), 0);
 }
 
+// 把流水按产品分组，将 O(产品数×流水数) 的重复 filter 塌缩为 O(流水数)
+export function groupTransactionsByProduct(transactions) {
+  const map = new Map();
+  for (const t of transactions) {
+    const pid = String(t.productId ?? t.product_id);
+    if (!map.has(pid)) map.set(pid, []);
+    map.get(pid).push(t);
+  }
+  return map;
+}
+
+// 按 id 建立 O(1) 查找索引（兼容 camelCase / snake_case 返回形状）
+export function indexById(items) {
+  const map = new Map();
+  for (const it of items) map.set(String(it.id), it);
+  return map;
+}
+
+// 直接对某产品的流水列表计算净库存，配合 groupTransactionsByProduct 使用
+export function computeBalanceFromList(list) {
+  return list.reduce((s, t) => (t.type === 'in' ? s + t.quantity : s - t.quantity), 0);
+}
+
 // 仅超级管理员可访问；message 可覆盖（备份接口需更明确的提示）
 export function requireAdmin(message = '无权操作') {
   return (req, res, next) => {

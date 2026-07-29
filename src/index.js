@@ -11,7 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { getPool, initDatabase, queryRows, queryRow, execute } from './db-mysql.js';
-import { computeBalance, requireAdmin, requireNonStaff, sendCsv } from './helpers.js';
+import { computeBalance, requireAdmin, requireNonStaff, sendCsv, groupTransactionsByProduct, indexById, computeBalanceFromList } from './helpers.js';
 
 // 先解析 __dirname，再加载 .env（确保 Passenger 等非标准 CWD 环境也能找到配置）
 const __filename = fileURLToPath(import.meta.url);
@@ -122,7 +122,7 @@ const upload = multer({
 const authenticate = (req, res, next) => {
   const h = req.headers.authorization;
   if (!h) return res.status(401).json({ message: 'No Token' });
-  jwt.verify(h.split(' ')[1], JWT_SECRET, (err, user) => {
+  jwt.verify(h.split(' ')[1], JWT_SECRET, { algorithms: ['HS256'] }, (err, user) => {
     if (err) return res.status(403).json({ message: 'Invalid Token' });
     req.user = user; next();
   });
@@ -286,7 +286,7 @@ app.post('/api/login', limLogin, async (req, res) => {
   const user = await findUserByUsername(username);
   if (!user || !(await bcrypt.compare(password, user.password))) return res.status(401).json({ message: '账号或密码错误' });
   const id = String(user.id);
-  const token = jwt.sign({ id, username: user.username, role: user.role }, JWT_SECRET);
+  const token = jwt.sign({ id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '12h' });
   res.json({ token, user: { id, username: user.username, role: user.role } });
 });
 
@@ -324,10 +324,11 @@ app.get('/api/inventory', authenticate, async (req, res) => {
     transactions = getLocalData().transactions.slice().reverse();
   }
   
+  const byProduct = groupTransactionsByProduct(transactions);
   res.json(products.map(p => {
     const pid = String(p.id);
-    const productTrans = transactions.filter(t => String(t.productId || t.product_id) === pid);
-    const balance = computeBalance(transactions, pid);
+    const productTrans = byProduct.get(pid) || [];
+    const balance = computeBalanceFromList(productTrans);
     const lastAction = productTrans[0];
     return { 
       ...p, 
@@ -727,13 +728,16 @@ app.get('/api/dashboard-stats', authenticate, async (req, res) => {
   const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
   const monthTrans = transactions.filter(t => new Date(t.date) >= monthStart);
 
+  const byProduct = groupTransactionsByProduct(transactions);
+  const productMap = indexById(products);
+
   const performance = {
     totalOut: monthTrans.filter(t => t.type === 'out').reduce((s, t) => {
-      const p = products.find(prod => String(prod.id) === String(t.productId || t.product_id));
+      const p = productMap.get(String(t.productId || t.product_id));
       return s + (t.quantity * (p?.unitPrice || p?.unit_price || 0));
     }, 0),
     totalIn: monthTrans.filter(t => t.type === 'in').reduce((s, t) => {
-      const p = products.find(prod => String(prod.id) === String(t.productId || t.product_id));
+      const p = productMap.get(String(t.productId || t.product_id));
       return s + (t.quantity * (p?.unitPrice || p?.unit_price || 0));
     }, 0),
     transCount: monthTrans.length,
@@ -743,7 +747,7 @@ app.get('/api/dashboard-stats', authenticate, async (req, res) => {
   const leaderboard = users.map(u => {
     const userTrans = monthTrans.filter(t => String(t.userId || t.user_id) === String(u.id));
     const totalAmount = userTrans.reduce((s, t) => {
-      const p = products.find(prod => String(prod.id) === String(t.productId || t.product_id));
+      const p = productMap.get(String(t.productId || t.product_id));
       return s + (t.quantity * (p?.unitPrice || p?.unit_price || 0));
     }, 0);
     return { username: u.username, totalAmount };
@@ -751,7 +755,7 @@ app.get('/api/dashboard-stats', authenticate, async (req, res) => {
 
   const productMix = products.map(p => {
     const pid = String(p.id);
-    const balance = computeBalance(transactions, pid);
+    const balance = computeBalanceFromList(byProduct.get(pid) || []);
     return { name: p.name, balance };
   }).sort((a, b) => b.balance - a.balance).slice(0, 7);
 
@@ -813,9 +817,10 @@ app.get('/api/inventory/alerts', authenticate, async (req, res) => {
     products = getLocalData().products;
     transactions = getLocalData().transactions;
   }
+  const byProduct = groupTransactionsByProduct(transactions);
   const alerts = products.map(p => {
     const pid = String(p.id);
-    const balance = computeBalance(transactions, pid);
+    const balance = computeBalanceFromList(byProduct.get(pid) || []);
     return { ...p, id: pid, balance };
   }).filter(p => p.balance <= threshold && p.balance >= 0).sort((a, b) => a.balance - b.balance);
   res.json(alerts);
@@ -833,10 +838,11 @@ app.get('/api/export/inventory', authenticate, async (req, res) => {
     products = getLocalData().products;
     transactions = getLocalData().transactions;
   }
+  const byProduct = groupTransactionsByProduct(transactions);
   const rows = products.map(p => {
     const pid = String(p.id);
-    const pTrans = transactions.filter(t => String(t.productId || t.product_id) === pid);
-    const balance = computeBalance(transactions, pid);
+    const pTrans = byProduct.get(pid) || [];
+    const balance = computeBalanceFromList(pTrans);
     const totalIn = pTrans.filter(t => t.type === 'in').reduce((s, t) => s + t.quantity, 0);
     const totalOut = pTrans.filter(t => t.type === 'out').reduce((s, t) => s + t.quantity, 0);
     return [p.name, p.sku || '', p.category || '', p.unitPrice || p.unit_price || 0, p.currency || 'CNY', balance, totalIn, totalOut, p.creatorName || p.creator_name || ''];
