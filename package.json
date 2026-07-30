@@ -1,6 +1,6 @@
 {
   "name": "backend",
-  "version": "1.1.70",
+  "version": "1.1.71",
   "type": "module",
   "description": "",
   "main": "src/index.js",
