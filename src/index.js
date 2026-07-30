@@ -460,8 +460,9 @@ app.get('/api/transactions', authenticate, async (req, res) => {
     const rows = await queryRows(sql, params);
     const uid = String(req.user.id);
     res.json(rows.map(t => {
-      const o = { ...t, id: String(t.id), productId: t.product_id ? String(t.product_id) : '' };
-      const ownerId = String(t.user_id || t.userId);
+      // 注意：queryRows 已把列名转为 camelCase，故 t.product_id 实为 undefined，应优先取 t.productId
+      const o = { ...t, id: String(t.id), productId: String(t.productId ?? t.product_id ?? '') };
+      const ownerId = String(t.userId || t.user_id);
       const canSee = req.user.role === 'admin' || req.user.role === 'manager' || ownerId === uid;
       const rawCust = o.customerName || o.customer_name || '';
       o.customerRestricted = !canSee && !!rawCust;

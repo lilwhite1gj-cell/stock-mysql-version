@@ -7,6 +7,11 @@
 > - **更新日志与版本号自动同步**：CI 会自动把更新日志顶部第一个版本标题（`## [x.y.z]`）改写为生成的 `## [1.2.N] - 当天日期`；但"改了什么"仍需手动填写，CI 不会自动总结。
 > - **开发流程**：每次新增/修改功能后，请在本文件顶部手动添加一节 `## [1.2.N] - YYYY-MM-DD` 并填写变更要点（参考下方历史格式），再提交推送。版本号以部署后 `/api/version` 实际显示的 `1.2.N` 为准。
 
+## [1.2.N] - 2026-07-30
+
+### 修复
+- 🐛 收发明细/商品详情 `productId` 恒为空导致所有交易显示"已删"、商品生命周期空白：根因是 `src/db-mysql.js` 的 `queryRows` 已对 MySQL 查询结果执行 snake→camel 转换（`product_id`→`productId`），但 `GET /api/transactions` 响应映射里却裸写 `productId: t.product_id ? ... : ''`，在 camelCase 返回下 `t.product_id` 恒为 `undefined`，使 `productId` 恒为 `''`，前端 `products.find(x => x.id === t.productId)` 永远匹配不到。已改为 `productId: String(t.productId ?? t.product_id ?? '')`（与 JSON 分支一致），并全量核查其余 snake 字段引用均带驼峰兜底，确认无同类隐患。此修复同时解决了此前同类问题（商品生命周期不显示、流水详情显示"产品已被移除"）
+
 ## [1.2.87] - 2026-07-30
 
 ### 新增
