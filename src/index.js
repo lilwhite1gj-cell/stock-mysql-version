@@ -456,7 +456,7 @@ app.get('/api/transactions', authenticate, async (req, res) => {
     const rows = await queryRows(sql, params);
     const uid = String(req.user.id);
     res.json(rows.map(t => {
-      const o = { ...t, id: String(t.id) };
+      const o = { ...t, id: String(t.id), productId: String(t.product_id) };
       const ownerId = String(t.user_id || t.userId);
       const canSee = req.user.role === 'admin' || req.user.role === 'manager' || ownerId === uid;
       const rawCust = o.customerName || o.customer_name || '';
@@ -472,7 +472,7 @@ app.get('/api/transactions', authenticate, async (req, res) => {
     if (type && ['in', 'out'].includes(type)) trans = trans.filter(t => t.type === type);
     const uid = String(req.user.id);
     res.json(trans.map(t => {
-      const o = { ...t, id: String(t.id) };
+      const o = { ...t, id: String(t.id), productId: String(t.productId ?? t.product_id ?? '') };
       const ownerId = String(t.userId || t.user_id);
       const canSee = req.user.role === 'admin' || req.user.role === 'manager' || ownerId === uid;
       const rawCust = o.customerName || o.customer_name || '';

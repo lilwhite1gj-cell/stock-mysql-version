@@ -1705,7 +1705,7 @@
             
             // 实时获取该产品的所有流水记录
             const transRes = await api.get('/transactions');
-            const pTrans = transRes.data.filter(t => String(t.productId) === String(id)).sort((a,b) => new Date(b.date) - new Date(a.date));
+            const pTrans = transRes.data.filter(t => String(t.productId ?? t.product_id) === String(id)).sort((a,b) => new Date(b.date) - new Date(a.date));
             
             const totalIn = pTrans.filter(t => t.type === 'in').reduce((s,t) => s + t.quantity, 0);
             const totalOut = pTrans.filter(t => t.type === 'out').reduce((s,t) => s + t.quantity, 0);
