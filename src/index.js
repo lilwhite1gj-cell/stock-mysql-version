@@ -325,14 +325,21 @@ app.get('/api/inventory', authenticate, async (req, res) => {
   }
   
   const byProduct = groupTransactionsByProduct(transactions);
+  const uid = String(req.user.id);
   res.json(products.map(p => {
     const pid = String(p.id);
     const productTrans = byProduct.get(pid) || [];
     const balance = computeBalanceFromList(productTrans);
     const lastAction = productTrans[0];
+    const ownerId = String(p.created_by || p.createdBy);
+    const rawCust = p.customer_name || p.customerName || '';
+    const canSeeCust = req.user.role === 'admin' || req.user.role === 'manager' || ownerId === uid;
     return { 
       ...p, 
       id: pid, 
+      customerName: canSeeCust ? rawCust : '',
+      customer_name: canSeeCust ? rawCust : '',
+      customerRestricted: !canSeeCust && !!rawCust,
       balance,
       lastOperator: lastAction ? lastAction.username : (p.creatorName || p.creator_name || '系统初始化'),
       lastDate: lastAction ? lastAction.date : null
@@ -417,13 +424,31 @@ app.get('/api/transactions', authenticate, async (req, res) => {
     if (type && ['in', 'out'].includes(type)) { sql += ' AND type = ?'; params.push(type); }
     sql += ' ORDER BY date DESC';
     const rows = await queryRows(sql, params);
-    res.json(rows.map(t => ({ ...t, id: String(t.id) })));
+    const uid = String(req.user.id);
+    res.json(rows.map(t => {
+      const o = { ...t, id: String(t.id) };
+      const ownerId = String(t.user_id || t.userId);
+      const canSee = req.user.role === 'admin' || req.user.role === 'manager' || ownerId === uid;
+      const rawCust = o.customerName || o.customer_name || '';
+      o.customerRestricted = !canSee && !!rawCust;
+      if (!canSee) { o.customerName = ''; o.customer_name = ''; }
+      return o;
+    }));
   } else {
     let trans = getLocalData().transactions.slice().reverse();
     if (startDate) trans = trans.filter(t => new Date(t.date) >= new Date(startDate));
     if (endDate) trans = trans.filter(t => new Date(t.date) <= new Date(endDate + 'T23:59:59'));
     if (type && ['in', 'out'].includes(type)) trans = trans.filter(t => t.type === type);
-    res.json(trans.map(t => ({ ...t, id: String(t.id) })));
+    const uid = String(req.user.id);
+    res.json(trans.map(t => {
+      const o = { ...t, id: String(t.id) };
+      const ownerId = String(t.userId || t.user_id);
+      const canSee = req.user.role === 'admin' || req.user.role === 'manager' || ownerId === uid;
+      const rawCust = o.customerName || o.customer_name || '';
+      o.customerRestricted = !canSee && !!rawCust;
+      if (!canSee) { o.customerName = ''; o.customer_name = ''; }
+      return o;
+    }));
   }
 });
 
@@ -582,12 +607,30 @@ app.delete('/api/admin/users/:id', authenticate, requireAdmin(), async (req, res
 
 app.post('/api/admin/change-role', authenticate, requireAdmin(), async (req, res) => {
   const { userId, newRole } = req.body;
+  // 角色值白名单校验，防止非法角色破坏权限体系
+  if (!['admin', 'manager', 'staff'].includes(newRole)) return res.status(400).json({ message: '无效的角色类型' });
+  // 禁止降级自己，避免误操作导致权限丢失
+  if (String(userId) === String(req.user.id)) return res.status(400).json({ message: '无法调整自身角色' });
   if (useMySQL) {
+    // 如果目标用户是 admin 且新角色非 admin，检查是否为最后一个管理员
+    if (newRole !== 'admin') {
+      const target = await queryRow('SELECT role FROM users WHERE id = ?', [userId]);
+      if (target && target.role === 'admin') {
+        const [adminRows] = await (await getPool()).query("SELECT COUNT(*) as cnt FROM users WHERE role = 'admin'");
+        if (adminRows[0].cnt <= 1) return res.status(400).json({ message: '无法降级最后一位管理员' });
+      }
+    }
     await execute('UPDATE users SET role = ? WHERE id = ?', [newRole, userId]);
   } else {
     const db = getLocalData();
     const idx = db.users.findIndex(u => u.id === userId);
-    if (idx !== -1) db.users[idx].role = newRole;
+    if (idx !== -1) {
+      if (newRole !== 'admin' && db.users[idx].role === 'admin') {
+        const adminCount = db.users.filter(u => u.role === 'admin').length;
+        if (adminCount <= 1) return res.status(400).json({ message: '无法降级最后一位管理员' });
+      }
+      db.users[idx].role = newRole;
+    }
     saveLocalData(db);
   }
   res.json({ message: 'Success' });
@@ -682,7 +725,7 @@ app.delete('/api/factories/:id', authenticate, async (req, res) => {
 
 app.post('/api/factories', authenticate, async (req, res) => {
   const id = Date.now().toString();
-  const color = '#' + Math.floor(Math.random() * 16777215).toString(16);
+  const color = '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
   const data = { ...req.body, id, color };
   if (useMySQL) {
     await execute('INSERT INTO factories (id, name, address, color) VALUES (?, ?, ?, ?)', [id, req.body.name, req.body.address || '', color]);
@@ -798,11 +841,19 @@ app.get('/api/factories', authenticate, async (req, res) => {
 });
 
 app.get('/api/customers', authenticate, async (req, res) => {
+  const isPrivileged = req.user.role === 'admin' || req.user.role === 'manager';
   if (useMySQL) {
-    const rows = await queryRows('SELECT * FROM customers');
+    const rows = isPrivileged
+      ? await queryRows('SELECT * FROM customers')
+      : await queryRows('SELECT * FROM customers WHERE created_by = ?', [String(req.user.id)]);
     res.json(rows.map(x => ({ ...x, id: String(x.id) })));
   } else {
-    res.json(getLocalData().customers.map(x => ({ ...x, id: String(x.id) })));
+    let list = getLocalData().customers;
+    if (!isPrivileged) {
+      const uid = String(req.user.id);
+      list = list.filter(c => String(c.created_by || c.createdBy) === uid);
+    }
+    res.json(list.map(x => ({ ...x, id: String(x.id) })));
   }
 });
 
@@ -953,11 +1004,11 @@ app.post('/api/backup/import', authenticate, requireAdmin('仅管理员可操作
             [String(p.id || p.product_id || Date.now()), p.name, p.sku || '', p.category || '', p.unitPrice || p.unit_price || 0, p.currency || 'CNY', p.factoryId || p.factory_id || '', p.customerName || p.customer_name || '', p.packaging || '', p.spec || '', p.material || '', p.notes || '', p.image || '', p.createdBy || p.created_by || '', p.creatorName || p.creator_name || '']
           );
         }
-        // 导入交易记录
+        // 导入交易记录（含 receiver 和 batch_no，确保备份恢复不丢字段）
         for (const t of (backup.transactions || [])) {
           await conn.query(
-            'INSERT IGNORE INTO transactions (id, product_id, type, quantity, order_no, logistics_no, customer_name, notes, image, user_id, username, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [String(t.id || Date.now()), String(t.productId || t.product_id), t.type, t.quantity, t.orderNo || t.order_no || '', t.logisticsNo || t.logistics_no || '', t.customerName || t.customer_name || '', t.notes || '', t.image || '', String(t.userId || t.user_id || ''), t.username || '', t.date || new Date()]
+            'INSERT IGNORE INTO transactions (id, product_id, type, quantity, order_no, logistics_no, customer_name, receiver, batch_no, notes, image, user_id, username, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [String(t.id || Date.now()), String(t.productId || t.product_id), t.type, t.quantity, t.orderNo || t.order_no || '', t.logisticsNo || t.logistics_no || '', t.customerName || t.customer_name || '', t.receiver || '', t.batchNo || t.batch_no || '', t.notes || '', t.image || '', String(t.userId || t.user_id || ''), t.username || '', t.date || new Date()]
           );
         }
         await conn.commit();
