@@ -13,7 +13,8 @@
 - 🔀 收发明细视图范围切换：收发明细页新增"视图范围"分段切换控件，支持两种模式——「仅自己」（默认，仅展示当前登录用户的业务流水）与「全部」（展示系统内全部用户的业务流水）。切换即时生效，无需刷新页面；默认选中"仅自己"，既有字段展示与排序方式保持不变，仅按所选模式过滤数据范围。后端 `GET /api/transactions` 新增 `scope` 参数（`self`/`all`），MySQL 与本地 JSON 双模式均已支持
 
 ### 修复
-- 🐛 库存台账「商品生命周期」不显示流转记录：根因为生产 MySQL 模式下 `GET /api/transactions` 返回的交易记录仅含 `product_id`（蛇形列名），前端详情页按 `t.productId`（驼峰）过滤导致永远匹配不到，生命周期恒为空。已在后端响应中统一补上 `productId` 映射（MySQL: `product_id` → `productId`；JSON: 兜底 `productId ?? product_id`），前端过滤逻辑增加 `?? t.product_id` 兜底。修复后初次入库/出库均能在商品档案全景看板的「全生命周期流转追溯」中正确展示
+- 🐛 库存台账「商品生命周期」不显示流转记录：根因为生产 MySQL 模式下 `GET /api/transactions` 返回的交易记录仅含 `product_id`（蛇形列名），前端详情页按 `t.productId`（驼峰）过滤导致永远匹配不到，生命周期恒为空。已在后端响应中统一补上 `productId` 映射（MySQL: `product_id` → `productId`；JSON: 兜底 `productId ?? product_id`），前端过滤逻辑增加 `?? t.product_id` 兜底。修复后初次入库/出库均能在商品档案全景看板的「全生命周期流转追溯」中正确展示；同时该修复一并修复了收发明细列表与流水详情页（`showTransDetail`）按 `t.productId` 关联产品名的功能（此前在 MySQL 模式下会显示"已删"/"产品已被移除"）
+- 🐛 库存台账「资产价值」列与工厂名在 MySQL 模式下显示异常：前端从 `GET /api/inventory` 读取 `unitPrice`/`factoryId`/`createdBy`/`creatorName`（驼峰），但 MySQL 返回的是 `unit_price`/`factory_id`/`created_by`/`creator_name`（蛇形），导致库存台账资产价值列显示 ¥0、工厂名空白、仪表盘估值归零。已在 `GET /api/inventory` 响应中补充驼峰别名（`unitPrice: unit_price ?? unitPrice` 等），JSON 模式下 `??` 回退到原值无副作用。修复后资产价值、工厂关联、按金额排序均恢复正常
 
 ## [1.2.0] - 2026-07-29
 

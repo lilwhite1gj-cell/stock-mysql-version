@@ -361,6 +361,10 @@ app.get('/api/inventory', authenticate, async (req, res) => {
     return { 
       ...p, 
       id: pid, 
+      unitPrice: p.unit_price ?? p.unitPrice,
+      factoryId: p.factory_id ?? p.factoryId,
+      createdBy: p.created_by ?? p.createdBy,
+      creatorName: p.creator_name ?? p.creatorName,
       customerName: canSeeCust ? rawCust : '',
       customer_name: canSeeCust ? rawCust : '',
       customerRestricted: !canSeeCust && !!rawCust,
