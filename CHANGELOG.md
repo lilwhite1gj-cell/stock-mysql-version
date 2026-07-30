@@ -12,7 +12,7 @@
 ### 修复
 - 🐛 收发明细/商品详情 `productId` 恒为空导致所有交易显示"已删"、商品生命周期空白：根因是 `src/db-mysql.js` 的 `queryRows` 已对 MySQL 查询结果执行 snake→camel 转换（`product_id`→`productId`），但 `GET /api/transactions` 响应映射里却裸写 `productId: t.product_id ? ... : ''`，在 camelCase 返回下 `t.product_id` 恒为 `undefined`，使 `productId` 恒为 `''`，前端 `products.find(x => x.id === t.productId)` 永远匹配不到。已改为 `productId: String(t.productId ?? t.product_id ?? '')`（与 JSON 分支一致），并全量核查其余 snake 字段引用均带驼峰兜底，确认无同类隐患。此修复同时解决了此前同类问题（商品生命周期不显示、流水详情显示"产品已被移除"）
 
-## [1.2.87] - 2026-07-30
+## [1.2.89] - 2026-07-30
 
 ### 新增
 - 🔀 收发明细视图范围切换：收发明细页新增"视图范围"分段切换控件，支持两种模式——「仅自己」（默认，仅展示当前登录用户的业务流水）与「全部」（展示系统内全部用户的业务流水）。切换即时生效，无需刷新页面；默认选中"仅自己"，既有字段展示与排序方式保持不变，仅按所选模式过滤数据范围。后端 `GET /api/transactions` 新增 `scope` 参数（`self`/`all`），MySQL 与本地 JSON 双模式均已支持
