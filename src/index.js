@@ -460,7 +460,7 @@ app.get('/api/transactions', authenticate, async (req, res) => {
     const rows = await queryRows(sql, params);
     const uid = String(req.user.id);
     res.json(rows.map(t => {
-      const o = { ...t, id: String(t.id), productId: String(t.product_id) };
+      const o = { ...t, id: String(t.id), productId: t.product_id ? String(t.product_id) : '' };
       const ownerId = String(t.user_id || t.userId);
       const canSee = req.user.role === 'admin' || req.user.role === 'manager' || ownerId === uid;
       const rawCust = o.customerName || o.customer_name || '';
