@@ -546,6 +546,18 @@
                         </div>
                     </div>
 
+                    <!-- 视图范围切换 -->
+                    <div class="flex items-center space-x-3 mb-1 flex-wrap">
+                        <div class="flex items-center space-x-2 bg-white px-4 py-2 rounded-2xl shadow-sm border border-slate-100">
+                            <span class="text-xs font-black text-slate-500 uppercase tracking-widest">视图范围</span>
+                            <div class="flex bg-slate-100 rounded-xl p-1">
+                                <button id="scopeSelfBtn" onclick="setTransScope('self')" class="px-3 py-1.5 rounded-lg text-xs font-black transition-all bg-indigo-600 text-white shadow-sm">仅自己</button>
+                                <button id="scopeAllBtn" onclick="setTransScope('all')" class="px-3 py-1.5 rounded-lg text-xs font-black transition-all text-slate-500">全部</button>
+                            </div>
+                        </div>
+                        <span class="text-xs font-bold text-slate-400">默认仅查看本人业务流水，切换即时生效</span>
+                    </div>
+
                     <!-- 增强型过滤器 -->
                     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 trans-filters">
                         <div class="flex items-center space-x-2 bg-white px-4 py-3 rounded-2xl shadow-sm border border-slate-100">
@@ -1285,6 +1297,17 @@
             } catch (e) { console.error('Dashboard load error:', e); }
         }
 
+        // 收发明细视图范围：self=仅本人流水, all=全部用户流水（默认 self）
+        let transScope = 'self';
+        function setTransScope(scope) {
+            transScope = scope;
+            const base = 'px-3 py-1.5 rounded-lg text-xs font-black transition-all';
+            const selfBtn = getEl('scopeSelfBtn'), allBtn = getEl('scopeAllBtn');
+            selfBtn.className = base + (scope === 'self' ? ' bg-indigo-600 text-white shadow-sm' : ' text-slate-500');
+            allBtn.className = base + (scope === 'all' ? ' bg-indigo-600 text-white shadow-sm' : ' text-slate-500');
+            renderTrans();
+        }
+
         async function renderTrans() {
             try {
                 // 构建带日期筛选的API请求
@@ -1292,6 +1315,7 @@
                 const filterType = getEl('transFilterType').value;
                 const startDate = getEl('transStartDate')?.value;
                 const endDate = getEl('transEndDate')?.value;
+                params.set('scope', transScope);
                 if (filterType !== 'all') params.set('type', filterType);
                 if (startDate) params.set('startDate', startDate);
                 if (endDate) params.set('endDate', endDate);

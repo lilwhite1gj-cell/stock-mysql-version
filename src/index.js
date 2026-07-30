@@ -443,10 +443,12 @@ app.delete('/api/products/:id', authenticate, requireNonStaff, async (req, res) 
 });
 
 app.get('/api/transactions', authenticate, async (req, res) => {
-  const { startDate, endDate, type } = req.query;
+  const { startDate, endDate, type, scope } = req.query;
   if (useMySQL) {
     let sql = 'SELECT * FROM transactions WHERE 1=1';
     const params = [];
+    // 视图范围：self=仅当前用户流水，all=全部用户流水（默认 self）
+    if (scope !== 'all') { sql += ' AND user_id = ?'; params.push(String(req.user.id)); }
     if (startDate) { sql += ' AND date >= ?'; params.push(startDate); }
     if (endDate) { sql += ' AND date <= ?'; params.push(endDate + ' 23:59:59'); }
     if (type && ['in', 'out'].includes(type)) { sql += ' AND type = ?'; params.push(type); }
@@ -464,6 +466,7 @@ app.get('/api/transactions', authenticate, async (req, res) => {
     }));
   } else {
     let trans = getLocalData().transactions.slice().reverse();
+    if (scope !== 'all') trans = trans.filter(t => String(t.userId || t.user_id) === String(req.user.id));
     if (startDate) trans = trans.filter(t => new Date(t.date) >= new Date(startDate));
     if (endDate) trans = trans.filter(t => new Date(t.date) <= new Date(endDate + 'T23:59:59'));
     if (type && ['in', 'out'].includes(type)) trans = trans.filter(t => t.type === type);
