@@ -125,6 +125,24 @@ export async function initDatabase() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+  // 操作审计日志表
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id VARCHAR(50),
+      username VARCHAR(100),
+      action VARCHAR(50) NOT NULL,
+      target_type VARCHAR(50),
+      target_id VARCHAR(100),
+      detail TEXT,
+      ip VARCHAR(50),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_user (user_id),
+      INDEX idx_action (action),
+      INDEX idx_created (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
   // 初始化默认管理员
   const [rows] = await db.query('SELECT COUNT(*) as cnt FROM users');
   if (rows[0].cnt === 0) {

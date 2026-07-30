@@ -207,6 +207,31 @@
             /* 移动端安全区域 */
             body { padding-bottom: env(safe-area-inset-bottom, 0px); }
 
+            /* 移动端操作日志页面适配 */
+            #page-audit .glass-card { padding: 1rem !important; border-radius: 20px !important; }
+            #page-audit .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+            #page-audit table { min-width: 600px; }
+            #page-audit th, #page-audit td { padding: 0.5rem !important; }
+
+            /* 移动端按钮触控优化：最小44px触控目标 */
+            .inv-header-actions button, .trans-header-actions button { min-height: 36px; padding: 8px 12px !important; }
+            .trans-filters button { min-height: 36px; }
+
+            /* 移动端表格横向滚动优化 */
+            .table-container-fix { -webkit-overflow-scrolling: touch; overflow-x: auto !important; }
+            .glass-card .overflow-x-auto { -webkit-overflow-scrolling: touch; }
+
+            /* 移动端弹窗内表格滚动 */
+            .modal-drawer .overflow-x-auto { -webkit-overflow-scrolling: touch; max-width: 100%; }
+
+            /* 移动端防误触：禁用长按选中 */
+            .clickable-row, .bottom-nav-item, .nav-item { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+
+            /* 移动端输入框增大触控区域 */
+            .modal-drawer input[type="text"], .modal-drawer input[type="number"], .modal-drawer select, .modal-drawer textarea {
+                min-height: 48px; padding: 12px 16px !important;
+            }
+
             /* 移动端toast位置调整 */
             #toast { bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important; }
         }
@@ -222,6 +247,10 @@
             #statCards .glass-card { padding: 0.625rem 0.75rem !important; }
             #statCards .text-3xl { font-size: 0.875rem !important; }
             .chart-doughnut-wrap { max-width: 240px; }
+            /* 小屏操作日志筛选单列 */
+            #page-audit .trans-filters { grid-template-columns: 1fr !important; }
+            /* 小屏库存页按钮缩小 */
+            .inv-header-actions button { font-size: 9px !important; padding: 6px 8px !important; }
         }
 
         /* ============================================================
@@ -312,6 +341,20 @@
         html { overflow-x: hidden; }
         img, svg, canvas { max-width: 100%; }
 
+        /* ---------- 8. 移动端触控体验增强 ---------- */
+        /* 消除300ms点击延迟 */
+        button, a, [role="button"], .nav-item, .bottom-nav-item, .clickable-row {
+            touch-action: manipulation;
+        }
+        /* 防止滚动链传播到背景 */
+        .modal-scroll, .detail-scroll-fix, .modal-drawer {
+            overscroll-behavior: contain;
+        }
+        /* 移动端表格容器防滚动穿透 */
+        .overflow-x-auto, .table-container-fix {
+            overscroll-behavior-x: contain;
+        }
+
         /* ---------- 7. 尊重“减少动效”偏好（无障碍） ---------- */
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after {
@@ -361,6 +404,7 @@
             <div onclick="showPage('factories')" id="nav-factories" class="nav-item"><i data-lucide="factory" class="w-5 h-5 mr-4"></i> 工厂档案</div>
             <div onclick="showPage('customers')" id="nav-customers" class="nav-item"><i data-lucide="users" class="w-5 h-5 mr-4"></i> 客户档案</div>
             <div onclick="showPage('settings')" id="nav-settings" class="nav-item"><i data-lucide="settings" class="w-5 h-5 mr-4"></i> 系统设置</div>
+            <div onclick="showPage('audit')" id="nav-audit" class="nav-item admin-only hidden"><i data-lucide="scroll" class="w-5 h-5 mr-4"></i> 操作日志</div>
         </div>
         <div class="p-6 border-t border-white/5"><button onclick="logout()" class="w-full flex items-center justify-center space-x-3 py-4 bg-white/5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-2xl transition-all font-bold text-sm active:scale-95"><i data-lucide="log-out" class="w-4 h-4"></i><span>退出登录</span></button></div>
     </aside>
@@ -446,7 +490,10 @@
                         <div class="flex flex-col items-end space-y-1 inv-header-actions">
                             <div class="flex items-center space-x-3">
                                 <button onclick="toggleDisplayCurrency()" class="currency-toggle-btn px-4 py-2 bg-white border border-slate-200/80 rounded-xl text-xs font-black text-indigo-600 shadow-sm active:scale-95 transition-all hover:shadow-md">显示币种: CNY</button>
-                                <button onclick="exportInventoryCSV()" class="px-4 py-2 bg-white border border-slate-200/80 rounded-xl text-xs font-black text-emerald-600 shadow-sm active:scale-95 transition-all flex items-center hover:shadow-md"><i data-lucide="file-spreadsheet" class="w-3 h-3 mr-1"></i>导出CSV</button>
+                                <button onclick="exportInventoryCSV()" class="px-4 py-2 bg-white border border-slate-200/80 rounded-xl text-xs font-black text-emerald-600 shadow-sm active:scale-95 transition-all flex items-center hover:shadow-md"><i data-lucide="file-spreadsheet" class="w-3 h-3 mr-1"></i>CSV</button>
+                                <button onclick="exportInventoryExcel()" class="px-4 py-2 bg-white border border-slate-200/80 rounded-xl text-xs font-black text-blue-600 shadow-sm active:scale-95 transition-all flex items-center hover:shadow-md"><i data-lucide="file-down" class="w-3 h-3 mr-1"></i>Excel</button>
+                                <button onclick="document.getElementById('importProdFile').click()" class="admin-only hidden px-4 py-2 bg-white border border-slate-200/80 rounded-xl text-xs font-black text-violet-600 shadow-sm active:scale-95 transition-all flex items-center hover:shadow-md"><i data-lucide="upload" class="w-3 h-3 mr-1"></i>批量导入</button>
+                                <input type="file" id="importProdFile" accept=".xlsx,.xls" class="hidden" onchange="importProducts(event)">
                                 <button onclick="openAddProdModal()" class="bg-gradient-to-br from-indigo-500 to-indigo-700 text-white w-14 h-14 rounded-2xl shadow-2xl shadow-indigo-300/40 flex items-center justify-center active:scale-90 transition-all hover:shadow-indigo-400/50"><i data-lucide="plus" class="w-8 h-8"></i></button>
                             </div>
                             <span onclick="fetchExchangeRate()" class="rate-display cursor-pointer hover:text-indigo-600 transition-colors text-xs font-black text-slate-500 bg-white/80 px-2 py-0.5 rounded-md tracking-widest text-center border border-slate-100/60" title="点击手动刷新汇率">正在同步汇率...</span>
@@ -536,6 +583,9 @@
                         <div class="flex items-center justify-center space-x-3 bg-white px-4 py-3 rounded-2xl shadow-sm border border-slate-100">
                             <button onclick="clearTransDateFilter()" class="text-xs font-black text-slate-500 hover:text-indigo-600 transition-colors">清除</button>
                             <button onclick="exportTransCSV()" class="text-xs font-black text-emerald-600 flex items-center"><i data-lucide="file-spreadsheet" class="w-3 h-3 mr-1"></i>CSV</button>
+                            <button onclick="exportTransExcel()" class="text-xs font-black text-blue-600 flex items-center"><i data-lucide="file-down" class="w-3 h-3 mr-1"></i>Excel</button>
+                            <button onclick="document.getElementById('importTransFile').click()" class="admin-only hidden text-xs font-black text-violet-600 flex items-center"><i data-lucide="upload" class="w-3 h-3 mr-1"></i>导入</button>
+                            <input type="file" id="importTransFile" accept=".xlsx,.xls" class="hidden" onchange="importTransactions(event)">
                         </div>
                     </div>
 
@@ -688,6 +738,32 @@
                                 </div>
                             </div>
                         </div>
+                        <!-- 批量导入工具 (管理员可见) -->
+                        <div class="admin-only hidden glass-card p-6 md:p-10 space-y-6 md:space-y-8 lg:col-span-2">
+                            <div class="flex items-center space-x-4 border-b border-slate-100 pb-4">
+                                <div class="w-10 h-10 bg-gradient-to-br from-violet-50 to-violet-100 rounded-xl flex items-center justify-center text-violet-600"><i data-lucide="upload-cloud"></i></div>
+                                <h3 class="text-xl font-black text-slate-700">批量导入工具</h3>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="bg-violet-50/50 border border-violet-100 rounded-[28px] p-6 space-y-4">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center text-violet-600"><i data-lucide="package"></i></div>
+                                        <div><p class="font-black text-slate-700">产品批量导入</p><p class="text-[10px] text-slate-400 font-bold">下载模板 → 填写 → 导入</p></div>
+                                    </div>
+                                    <button onclick="downloadImportTemplate('products')" class="w-full bg-gradient-to-r from-violet-500 to-violet-600 text-white py-3.5 rounded-[18px] font-black shadow-lg shadow-violet-200/50 active:scale-95 transition-all flex items-center justify-center space-x-2 hover:from-violet-600 hover:to-violet-700"><i data-lucide="download" class="w-4 h-4"></i><span>下载产品模板</span></button>
+                                </div>
+                                <div class="bg-blue-50/50 border border-blue-100 rounded-[28px] p-6 space-y-4">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600"><i data-lucide="refresh-ccw"></i></div>
+                                        <div><p class="font-black text-slate-700">流水批量导入</p><p class="text-[10px] text-slate-400 font-bold">下载模板 → 填写 → 导入</p></div>
+                                    </div>
+                                    <button onclick="downloadImportTemplate('transactions')" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3.5 rounded-[18px] font-black shadow-lg shadow-blue-200/50 active:scale-95 transition-all flex items-center justify-center space-x-2 hover:from-blue-600 hover:to-blue-700"><i data-lucide="download" class="w-4 h-4"></i><span>下载流水模板</span></button>
+                                </div>
+                            </div>
+                            <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                                <p class="text-xs text-amber-600 leading-relaxed"><i data-lucide="info" class="w-3 h-3 inline mr-1"></i>导入说明：请在库存台账页面点击"批量导入"按钮上传填写好的 Excel 文件。系统会自动校验数据并跳过重复项。</p>
+                            </div>
+                        </div>
                         <!-- 版本信息 -->
                         <div class="glass-card p-6 md:p-10 space-y-6 md:space-y-8 lg:col-span-2">
                             <div class="flex items-center space-x-4 border-b border-slate-100 pb-4">
@@ -696,7 +772,7 @@
                             </div>
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center space-x-3">
-                                    <span class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-500 text-white rounded-2xl text-sm font-black shadow-lg shadow-indigo-200/50" id="versionBadge">v1.1.71</span>
+                                    <span class="px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-500 text-white rounded-2xl text-sm font-black shadow-lg shadow-indigo-200/50" id="versionBadge">v1.2.0</span>
                                     <span class="text-xs text-slate-400 font-bold" id="versionDate"></span>
                                 </div>
                                 <button onclick="showChangelog()" class="flex items-center space-x-2 px-5 py-3 bg-slate-50 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 rounded-2xl font-bold text-sm transition-all active:scale-95">
@@ -705,6 +781,79 @@
                             </div>
                         </div>
                     </div>
+                    </div>
+                </div>
+
+                <!-- 操作日志 (管理员可见) -->
+                <div id="page-audit" class="page-content hidden space-y-6 page-enter">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-4xl font-black text-slate-900 tracking-tighter">操作日志</h2>
+                    </div>
+                    <!-- 筛选栏 -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 trans-filters">
+                        <div class="flex items-center space-x-2 bg-white px-4 py-3 rounded-2xl shadow-sm border border-slate-100">
+                            <span class="text-xs font-black text-slate-500 uppercase tracking-widest">用户</span>
+                            <input type="text" id="auditFilterUser" placeholder="全部" class="bg-transparent outline-none font-bold text-xs text-indigo-600 flex-1" autocomplete="off">
+                        </div>
+                        <div class="flex items-center space-x-2 bg-white px-4 py-3 rounded-2xl shadow-sm border border-slate-100">
+                            <span class="text-xs font-black text-slate-500 uppercase tracking-widest">操作</span>
+                            <select id="auditFilterAction" onchange="fetchAuditLogs()" class="bg-transparent outline-none font-black text-xs text-indigo-600 flex-1">
+                                <option value="">全部</option>
+                                <option value="product_create">创建产品</option>
+                                <option value="product_update">修改产品</option>
+                                <option value="product_delete">删除产品</option>
+                                <option value="transaction_create">创建流水</option>
+                                <option value="transaction_delete">删除流水</option>
+                                <option value="user_delete">删除用户</option>
+                                <option value="user_role_change">角色变更</option>
+                                <option value="user_password_reset">重置密码</option>
+                                <option value="factory_create">创建工厂</option>
+                                <option value="factory_delete">删除工厂</option>
+                                <option value="customer_create">创建客户</option>
+                                <option value="customer_delete">删除客户</option>
+                                <option value="category_create">创建品类</option>
+                                <option value="category_delete">删除品类</option>
+                                <option value="batch_import">批量导入</option>
+                                <option value="backup_import">备份导入</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center space-x-2 bg-white px-4 py-3 rounded-2xl shadow-sm border border-slate-100">
+                            <span class="text-xs font-black text-slate-500 uppercase tracking-widest">从</span>
+                            <input type="date" id="auditStartDate" class="bg-transparent outline-none font-bold text-xs text-indigo-600 flex-1">
+                        </div>
+                        <div class="flex items-center space-x-2 bg-white px-4 py-3 rounded-2xl shadow-sm border border-slate-100">
+                            <span class="text-xs font-black text-slate-500 uppercase tracking-widest">至</span>
+                            <input type="date" id="auditEndDate" class="bg-transparent outline-none font-bold text-xs text-indigo-600 flex-1">
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-3 mb-2">
+                        <button onclick="fetchAuditLogs()" class="px-5 py-2.5 bg-indigo-500 text-white rounded-xl text-xs font-black active:scale-95 transition-all hover:bg-indigo-600">查询</button>
+                        <button onclick="clearAuditFilter()" class="px-5 py-2.5 bg-slate-100 text-slate-500 rounded-xl text-xs font-black active:scale-95 transition-all hover:bg-slate-200">清除筛选</button>
+                    </div>
+                    <!-- 日志列表 -->
+                    <div class="glass-card p-6 md:p-8">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse min-w-[700px]">
+                                <thead class="bg-slate-50/50 border-b border-slate-100">
+                                    <tr>
+                                        <th class="p-4 text-xs font-black text-slate-600 uppercase tracking-widest">时间</th>
+                                        <th class="p-4 text-xs font-black text-slate-600 uppercase tracking-widest">操作人</th>
+                                        <th class="p-4 text-xs font-black text-slate-600 uppercase tracking-widest">操作类型</th>
+                                        <th class="p-4 text-xs font-black text-slate-600 uppercase tracking-widest">详情</th>
+                                        <th class="p-4 text-xs font-black text-slate-600 uppercase tracking-widest">IP</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="auditLogTable" class="divide-y divide-slate-50"></tbody>
+                            </table>
+                        </div>
+                        <!-- 分页 -->
+                        <div class="flex items-center justify-between mt-6 pt-4 border-t border-slate-50">
+                            <span id="auditPageInfo" class="text-xs text-slate-400 font-bold"></span>
+                            <div class="flex space-x-2">
+                                <button id="auditPrevBtn" onclick="changeAuditPage(-1)" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-black active:scale-95 transition-all disabled:opacity-30" disabled>上一页</button>
+                                <button id="auditNextBtn" onclick="changeAuditPage(1)" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-black active:scale-95 transition-all disabled:opacity-30" disabled>下一页</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1014,6 +1163,7 @@
             if (id === 'factories') renderFactoryUI(); 
             if (id === 'customers') renderCustomerUI();
             if (id === 'settings' && currentUser.role !== 'staff') fetchUsers();
+            if (id === 'audit' && currentUser.role !== 'staff') fetchAuditLogs();
         }
 
         async function loadDash() {
@@ -1734,6 +1884,173 @@
             } catch(e) { toast('❌ 导出失败', 'bg-red-600'); }
         }
 
+        // --- Excel 导出 ---
+        async function exportInventoryExcel() {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch('/api/export/inventory-excel', { headers: { 'Authorization': 'Bearer ' + token } });
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = 'inventory_' + new Date().toISOString().slice(0,10) + '.xlsx';
+                document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+                toast('✅ 库存汇总Excel已导出', 'bg-emerald-600');
+            } catch(e) { toast('❌ 导出失败', 'bg-red-600'); }
+        }
+        async function exportTransExcel() {
+            try {
+                const params = new URLSearchParams();
+                const filterType = getEl('transFilterType')?.value;
+                const startDate = getEl('transStartDate')?.value;
+                const endDate = getEl('transEndDate')?.value;
+                if (filterType !== 'all') params.set('type', filterType);
+                if (startDate) params.set('startDate', startDate);
+                if (endDate) params.set('endDate', endDate);
+                const token = localStorage.getItem('token');
+                const res = await fetch('/api/export/transactions-excel?' + params.toString(), { headers: { 'Authorization': 'Bearer ' + token } });
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = 'transactions_' + new Date().toISOString().slice(0,10) + '.xlsx';
+                document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+                toast('✅ 收发明细Excel已导出', 'bg-emerald-600');
+            } catch(e) { toast('❌ 导出失败', 'bg-red-600'); }
+        }
+        async function exportValuationExcel() {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch('/api/export/valuation-excel', { headers: { 'Authorization': 'Bearer ' + token } });
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = 'valuation_' + new Date().toISOString().slice(0,10) + '.xlsx';
+                document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+                toast('✅ 产品估值Excel已导出', 'bg-emerald-600');
+            } catch(e) { toast('❌ 导出失败', 'bg-red-600'); }
+        }
+
+        // --- 批量导入 ---
+        async function importProducts(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            customConfirm(`确认导入文件 [${file.name}] 中的产品数据？`, async () => {
+                try {
+                    getEl('globalLoading').classList.remove('hidden');
+                    const fd = new FormData();
+                    fd.append('file', file);
+                    const res = await api.post('/import/products', fd);
+                    toast(`✅ ${res.data.message}`, 'bg-emerald-600', 5000);
+                    if (res.data.errors?.length) console.log('导入错误:', res.data.errors);
+                    renderInventory();
+                } catch(e) {
+                    toast('❌ 导入失败：' + (e.response?.data?.message || e.message), 'bg-red-600');
+                } finally {
+                    getEl('globalLoading').classList.add('hidden');
+                }
+            });
+            event.target.value = '';
+        }
+        async function importTransactions(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            customConfirm(`确认导入文件 [${file.name}] 中的流水数据？`, async () => {
+                try {
+                    getEl('globalLoading').classList.remove('hidden');
+                    const fd = new FormData();
+                    fd.append('file', file);
+                    const res = await api.post('/import/transactions', fd);
+                    toast(`✅ ${res.data.message}`, 'bg-emerald-600', 5000);
+                    if (res.data.errors?.length) console.log('导入错误:', res.data.errors);
+                    renderTrans(); renderInventory();
+                } catch(e) {
+                    toast('❌ 导入失败：' + (e.response?.data?.message || e.message), 'bg-red-600');
+                } finally {
+                    getEl('globalLoading').classList.remove('hidden');
+                }
+            });
+            event.target.value = '';
+        }
+        async function downloadImportTemplate(type) {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`/api/import/template/${type}`, { headers: { 'Authorization': 'Bearer ' + token } });
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = `template_${type}.xlsx`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+                toast('✅ 模板已下载', 'bg-emerald-600');
+            } catch(e) { toast('❌ 下载失败', 'bg-red-600'); }
+        }
+
+        // --- 操作审计日志 ---
+        let auditPage = 1, auditPageSize = 20, auditTotal = 0;
+        async function fetchAuditLogs() {
+            try {
+                const params = new URLSearchParams();
+                params.set('page', auditPage);
+                params.set('pageSize', auditPageSize);
+                const user = getEl('auditFilterUser')?.value;
+                const action = getEl('auditFilterAction')?.value;
+                const startDate = getEl('auditStartDate')?.value;
+                const endDate = getEl('auditEndDate')?.value;
+                if (user) params.set('username', user);
+                if (action) params.set('action', action);
+                if (startDate) params.set('startDate', startDate);
+                if (endDate) params.set('endDate', endDate);
+                const res = await api.get('/admin/audit-logs?' + params.toString());
+                auditTotal = res.data.total;
+                renderAuditLogs(res.data.logs);
+            } catch(e) { console.error('Audit logs error:', e); toast('❌ 加载日志失败', 'bg-red-600'); }
+        }
+        function renderAuditLogs(logs) {
+            const actionLabels = {
+                'product_create': ['创建产品', 'bg-emerald-50 text-emerald-600'],
+                'product_update': ['修改产品', 'bg-amber-50 text-amber-600'],
+                'product_delete': ['删除产品', 'bg-rose-50 text-rose-600'],
+                'transaction_create': ['创建流水', 'bg-emerald-50 text-emerald-600'],
+                'transaction_delete': ['删除流水', 'bg-rose-50 text-rose-600'],
+                'user_delete': ['删除用户', 'bg-rose-50 text-rose-600'],
+                'user_role_change': ['角色变更', 'bg-indigo-50 text-indigo-600'],
+                'user_password_reset': ['重置密码', 'bg-amber-50 text-amber-600'],
+                'factory_create': ['创建工厂', 'bg-emerald-50 text-emerald-600'],
+                'factory_delete': ['删除工厂', 'bg-rose-50 text-rose-600'],
+                'customer_create': ['创建客户', 'bg-emerald-50 text-emerald-600'],
+                'customer_delete': ['删除客户', 'bg-rose-50 text-rose-600'],
+                'category_create': ['创建品类', 'bg-emerald-50 text-emerald-600'],
+                'category_delete': ['删除品类', 'bg-rose-50 text-rose-600'],
+                'batch_import': ['批量导入', 'bg-violet-50 text-violet-600'],
+                'backup_import': ['备份导入', 'bg-blue-50 text-blue-600'],
+            };
+            const tbl = getEl('auditLogTable');
+            if (!logs.length) {
+                tbl.innerHTML = '<tr><td colspan="5" class="p-10 text-center text-slate-400 font-black text-sm uppercase tracking-widest">暂无操作日志记录</td></tr>';
+            } else {
+                tbl.innerHTML = logs.map(l => {
+                    const [label, colorClass] = actionLabels[l.action] || [l.action, 'bg-slate-50 text-slate-600'];
+                    const d = new Date(l.createdAt || l.created_at);
+                    return `<tr class="hover:bg-slate-50/50 transition-colors">
+                        <td class="p-4 text-xs text-slate-500 font-bold whitespace-nowrap">${d.toLocaleString('zh-CN')}</td>
+                        <td class="p-4 text-xs font-black text-slate-700">${esc(l.username || '')}</td>
+                        <td class="p-4"><span class="px-2 py-1 rounded-md text-xs font-black border ${colorClass}">${label}</span></td>
+                        <td class="p-4 text-xs text-slate-600">${esc(l.detail || '')}</td>
+                        <td class="p-4 text-xs text-slate-400 font-mono">${esc(l.ip || '')}</td>
+                    </tr>`;
+                }).join('');
+            }
+            // 分页控件
+            const totalPages = Math.ceil(auditTotal / auditPageSize) || 1;
+            getEl('auditPageInfo').textContent = `第 ${auditPage} / ${totalPages} 页，共 ${auditTotal} 条记录`;
+            getEl('auditPrevBtn').disabled = auditPage <= 1;
+            getEl('auditNextBtn').disabled = auditPage >= totalPages;
+        }
+        function changeAuditPage(delta) {
+            auditPage = Math.max(1, auditPage + delta);
+            fetchAuditLogs();
+        }
+        function clearAuditFilter() {
+            auditPage = 1;
+            ['auditFilterUser', 'auditStartDate', 'auditEndDate'].forEach(id => { const el = getEl(id); if(el) el.value = ''; });
+            const af = getEl('auditFilterAction'); if(af) af.selectedIndex = 0;
+            fetchAuditLogs();
+        }
+
         // --- 日期筛选清除 ---
         function clearTransDateFilter() {
             const s = getEl('transStartDate'), e = getEl('transEndDate');
@@ -1810,7 +2127,7 @@
         }
 
         // --- 版本信息 ---
-        let appVersion = '1.1.71';
+        let appVersion = '1.2.0';
         async function fetchVersion() {
             try {
                 const res = await api.get('/version');

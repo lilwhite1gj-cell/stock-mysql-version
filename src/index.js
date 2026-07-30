@@ -10,6 +10,7 @@ import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import ExcelJS from 'exceljs';
 import { getPool, initDatabase, queryRows, queryRow, execute } from './db-mysql.js';
 import { computeBalance, requireAdmin, requireNonStaff, sendCsv, groupTransactionsByProduct, indexById, computeBalanceFromList } from './helpers.js';
 
@@ -134,6 +135,29 @@ async function findUserByUsername(username) {
     return await queryRow('SELECT * FROM users WHERE username = ?', [username]);
   }
   return getLocalData().users.find(u => u.username === username);
+}
+
+// --- 操作审计日志 ---
+async function logAction(req, action, targetType, targetId, detail) {
+  try {
+    const userId = String(req.user?.id || '');
+    const username = req.user?.username || '';
+    const ip = req.ip || req.socket?.remoteAddress || '';
+    if (useMySQL) {
+      await execute(
+        'INSERT INTO audit_logs (user_id, username, action, target_type, target_id, detail, ip) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [userId, username, action, targetType, String(targetId || ''), detail || '', ip]
+      );
+    } else {
+      const db = getLocalData();
+      if (!db.auditLogs) db.auditLogs = [];
+      db.auditLogs.push({ id: Date.now(), userId, username, action, targetType, targetId: String(targetId || ''), detail: detail || '', ip, createdAt: new Date().toISOString() });
+      if (db.auditLogs.length > 5000) db.auditLogs = db.auditLogs.slice(-5000);
+      saveLocalData(db);
+    }
+  } catch (e) {
+    console.error('审计日志写入失败:', e.message);
+  }
 }
 
 // --- 简单内存限流（防止暴力破解 / 账号枚举），无需额外依赖 ---
@@ -366,6 +390,7 @@ app.post('/api/products', authenticate, upload.single('image'), async (req, res)
       'INSERT INTO products (id, name, sku, category, unit_price, currency, factory_id, customer_name, packaging, spec, material, notes, image, created_by, creator_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [data.id, data.name, data.sku, data.category, data.unitPrice, data.currency, data.factoryId, data.customerName, data.packaging, data.spec, data.material, data.notes, data.image, data.createdBy, data.creatorName]
     );
+    await logAction(req, 'product_create', 'product', data.id, `创建产品: ${data.name}`);
     res.json(data);
   } else {
     const db = getLocalData(); db.products.push(data); saveLocalData(db); res.json(data);
@@ -388,6 +413,7 @@ app.put('/api/products/:id', authenticate, requireNonStaff, upload.single('image
       await execute(`UPDATE products SET ${fields.join(', ')} WHERE id = ?`, values);
     }
     const updated = await queryRow('SELECT * FROM products WHERE id = ?', [req.params.id]);
+    await logAction(req, 'product_update', 'product', req.params.id, `修改产品: ${updated?.name || req.params.id}`);
     res.json(updated);
   } else {
     const db = getLocalData();
@@ -404,7 +430,9 @@ app.delete('/api/products/:id', authenticate, requireNonStaff, async (req, res) 
   if (useMySQL) {
     const [transRows] = await (await getPool()).query('SELECT COUNT(*) as cnt FROM transactions WHERE product_id = ?', [req.params.id]);
     if (transRows[0].cnt > 0) return res.status(400).json({ message: '已有业务流水记录' });
+    const prod = await queryRow('SELECT name FROM products WHERE id = ?', [req.params.id]);
     await execute('DELETE FROM products WHERE id = ?', [req.params.id]);
+    await logAction(req, 'product_delete', 'product', req.params.id, `删除产品: ${prod?.name || req.params.id}`);
   } else {
     const db = getLocalData();
     if (db.transactions.some(t => t.productId === req.params.id)) return res.status(400).json({ message: '已有业务流水记录' });
@@ -492,6 +520,7 @@ app.post('/api/transactions', authenticate, upload.single('transImage'), async (
           [data.id, data.productId, data.type, data.quantity, data.orderNo, data.logisticsNo, data.customerName, data.receiver, data.batchNo, data.notes, data.image, data.userId, data.username, data.date]
         );
         await conn.commit();
+        await logAction(req, 'transaction_create', 'transaction', data.id, `出库 ${data.quantity} 包 (产品ID: ${data.productId})`);
         return res.json(data);
       } catch (e) {
         await conn.rollback();
@@ -508,6 +537,7 @@ app.post('/api/transactions', authenticate, upload.single('transImage'), async (
         return res.status(400).json({ message: `库存不足！当前库存 ${balance}，出库数量 ${quantity} 超出可用库存` });
       }
       db.transactions.push(data); saveLocalData(db);
+      await logAction(req, 'transaction_create', 'transaction', data.id, `出库 ${data.quantity} 包 (产品ID: ${data.productId})`);
       return res.json(data);
     }
   }
@@ -518,9 +548,12 @@ app.post('/api/transactions', authenticate, upload.single('transImage'), async (
       'INSERT INTO transactions (id, product_id, type, quantity, order_no, logistics_no, customer_name, receiver, batch_no, notes, image, user_id, username, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [data.id, data.productId, data.type, data.quantity, data.orderNo, data.logisticsNo, data.customerName, data.receiver, data.batchNo, data.notes, data.image, data.userId, data.username, data.date]
     );
+    await logAction(req, 'transaction_create', 'transaction', data.id, `入库 ${data.quantity} 包 (产品ID: ${data.productId})`);
     res.json(data);
   } else {
-    const db = getLocalData(); db.transactions.push(data); saveLocalData(db); res.json(data);
+    const db = getLocalData(); db.transactions.push(data); saveLocalData(db);
+    await logAction(req, 'transaction_create', 'transaction', data.id, `入库 ${data.quantity} 包 (产品ID: ${data.productId})`);
+    res.json(data);
   }
 });
 
@@ -550,6 +583,7 @@ app.delete('/api/transactions/:id', authenticate, requireNonStaff, async (req, r
       }
       await conn.execute('DELETE FROM transactions WHERE id = ?', [req.params.id]);
       await conn.commit();
+      await logAction(req, 'transaction_delete', 'transaction', req.params.id, `删除流水: ${type} ${quantity}包 (产品ID: ${pid})`);
       res.json({ message: 'Success' });
     } catch (e) {
       await conn.rollback();
@@ -572,6 +606,7 @@ app.delete('/api/transactions/:id', authenticate, requireNonStaff, async (req, r
     }
     db.transactions = db.transactions.filter(t => t.id !== req.params.id);
     saveLocalData(db);
+    await logAction(req, 'transaction_delete', 'transaction', req.params.id, `删除流水: ${trans.type} ${trans.quantity}包`);
     res.json({ message: 'Success' });
   }
 });
@@ -590,10 +625,11 @@ app.delete('/api/admin/users/:id', authenticate, requireAdmin(), async (req, res
   if (req.params.id === req.user.id) return res.status(400).json({ message: '无法删除本人' });
   
   if (useMySQL) {
-    const target = await queryRow('SELECT role FROM users WHERE id = ?', [req.params.id]);
+    const target = await queryRow('SELECT role, username FROM users WHERE id = ?', [req.params.id]);
     if (!target) return res.status(404).json({ message: '用户不存在' });
     if (target.role === 'admin') return res.status(400).json({ message: '无法删除最高管理员' });
     await execute('DELETE FROM users WHERE id = ?', [req.params.id]);
+    await logAction(req, 'user_delete', 'user', req.params.id, `删除用户: ${target.username}`);
   } else {
     const db = getLocalData();
     const idx = db.users.findIndex(u => u.id === req.params.id);
@@ -621,6 +657,7 @@ app.post('/api/admin/change-role', authenticate, requireAdmin(), async (req, res
       }
     }
     await execute('UPDATE users SET role = ? WHERE id = ?', [newRole, userId]);
+    await logAction(req, 'user_role_change', 'user', userId, `角色变更为: ${newRole}`);
   } else {
     const db = getLocalData();
     const idx = db.users.findIndex(u => u.id === userId);
@@ -644,6 +681,7 @@ app.post('/api/admin/reset-password', authenticate, requireAdmin(), async (req, 
     const hashed = await bcrypt.hash(newPassword, 10);
     if (useMySQL) {
       await execute('UPDATE users SET password = ? WHERE id = ?', [hashed, userId]);
+      await logAction(req, 'user_password_reset', 'user', userId, `管理员重置用户密码`);
     } else {
       const db = getLocalData();
       const idx = db.users.findIndex(u => u.id === userId);
@@ -696,6 +734,7 @@ app.delete('/api/categories/:name', authenticate, async (req, res) => {
   const name = decodeURIComponent(req.params.name);
   if (useMySQL) {
     await execute('DELETE FROM categories WHERE name = ?', [name]);
+    await logAction(req, 'category_delete', 'category', name, `删除品类: ${name}`);
   } else {
     const db = getLocalData();
     db.categories = db.categories.filter(c => c !== name);
@@ -708,6 +747,7 @@ app.post('/api/categories', authenticate, async (req, res) => {
   const { name } = req.body;
   if (useMySQL) {
     try { await execute('INSERT INTO categories (name) VALUES (?)', [name]); } catch (e) { if (e.code !== 'ER_DUP_ENTRY') throw e; }
+    await logAction(req, 'category_create', 'category', name, `创建品类: ${name}`);
   } else {
     const db = getLocalData(); db.categories.push(name); saveLocalData(db);
   }
@@ -717,6 +757,7 @@ app.post('/api/categories', authenticate, async (req, res) => {
 app.delete('/api/factories/:id', authenticate, async (req, res) => {
   if (useMySQL) {
     await execute('DELETE FROM factories WHERE id = ?', [req.params.id]);
+    await logAction(req, 'factory_delete', 'factory', req.params.id, `删除工厂档案`);
   } else {
     const db = getLocalData(); db.factories = db.factories.filter(f => f.id !== req.params.id); saveLocalData(db);
   }
@@ -729,6 +770,7 @@ app.post('/api/factories', authenticate, async (req, res) => {
   const data = { ...req.body, id, color };
   if (useMySQL) {
     await execute('INSERT INTO factories (id, name, address, color) VALUES (?, ?, ?, ?)', [id, req.body.name, req.body.address || '', color]);
+    await logAction(req, 'factory_create', 'factory', id, `创建工厂: ${req.body.name}`);
     res.json(data);
   } else {
     const db = getLocalData(); db.factories.push(data); saveLocalData(db); res.json(data);
@@ -738,6 +780,7 @@ app.post('/api/factories', authenticate, async (req, res) => {
 app.delete('/api/customers/:id', authenticate, async (req, res) => {
   if (useMySQL) {
     await execute('DELETE FROM customers WHERE id = ?', [req.params.id]);
+    await logAction(req, 'customer_delete', 'customer', req.params.id, `删除客户档案`);
   } else {
     const db = getLocalData(); db.customers = db.customers.filter(c => c.id !== req.params.id); saveLocalData(db);
   }
@@ -749,6 +792,7 @@ app.post('/api/customers', authenticate, async (req, res) => {
   const data = { ...req.body, id, createdBy: req.user.id };
   if (useMySQL) {
     await execute('INSERT INTO customers (id, name, address, phone, created_by) VALUES (?, ?, ?, ?, ?)', [id, req.body.name, req.body.address || '', req.body.phone || '', req.user.id]);
+    await logAction(req, 'customer_create', 'customer', id, `创建客户: ${req.body.name}`);
     res.json(data);
   } else {
     const db = getLocalData(); db.customers.push(data); saveLocalData(db); res.json(data);
@@ -1031,9 +1075,477 @@ app.post('/api/backup/import', authenticate, requireAdmin('仅管理员可操作
       };
       saveLocalData(imported);
     }
+    await logAction(req, 'backup_import', 'system', '', `导入备份: ${backup.users?.length || 0}用户, ${backup.products?.length || 0}产品, ${backup.transactions?.length || 0}流水`);
     res.json({ message: '数据恢复成功', stats: { users: backup.users?.length || 0, products: backup.products?.length || 0, transactions: backup.transactions?.length || 0 } });
   } catch (e) {
     console.error('导入失败:', e);
+    res.status(500).json({ message: '导入失败: ' + e.message });
+  }
+});
+
+// --- 操作审计日志查询 ---
+app.get('/api/admin/audit-logs', authenticate, requireAdmin(), async (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize) || 20));
+  const { username, action, startDate, endDate } = req.query;
+
+  if (useMySQL) {
+    let sql = 'SELECT * FROM audit_logs WHERE 1=1';
+    const params = [];
+    if (username) { sql += ' AND username = ?'; params.push(username); }
+    if (action) { sql += ' AND action = ?'; params.push(action); }
+    if (startDate) { sql += ' AND created_at >= ?'; params.push(startDate); }
+    if (endDate) { sql += ' AND created_at <= ?'; params.push(endDate + ' 23:59:59'); }
+
+    const countSql = sql.replace('SELECT *', 'SELECT COUNT(*) as cnt');
+    const [cntRows] = await (await getPool()).query(countSql, params);
+    const total = cntRows[0].cnt;
+
+    sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    params.push(pageSize, (page - 1) * pageSize);
+    const rows = await queryRows(sql, params);
+    res.json({ logs: rows, total, page, pageSize });
+  } else {
+    let logs = (getLocalData().auditLogs || []).slice().reverse();
+    if (username) logs = logs.filter(l => l.username === username);
+    if (action) logs = logs.filter(l => l.action === action);
+    if (startDate) logs = logs.filter(l => new Date(l.createdAt) >= new Date(startDate));
+    if (endDate) logs = logs.filter(l => new Date(l.createdAt) <= new Date(endDate + 'T23:59:59'));
+    const total = logs.length;
+    const paged = logs.slice((page - 1) * pageSize, page * pageSize);
+    res.json({ logs: paged, total, page, pageSize });
+  }
+});
+
+// --- Excel 报表导出 ---
+app.get('/api/export/inventory-excel', authenticate, async (req, res) => {
+  try {
+    let products, transactions;
+    if (useMySQL) {
+      products = await queryRows('SELECT * FROM products');
+      transactions = await queryRows('SELECT * FROM transactions');
+    } else {
+      products = getLocalData().products;
+      transactions = getLocalData().transactions;
+    }
+    const byProduct = groupTransactionsByProduct(transactions);
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('库存汇总表');
+    ws.columns = [
+      { header: '产品名称', key: 'name', width: 30 },
+      { header: '货号SKU', key: 'sku', width: 18 },
+      { header: '品类', key: 'category', width: 14 },
+      { header: '单价', key: 'unitPrice', width: 12 },
+      { header: '币种', key: 'currency', width: 8 },
+      { header: '当前库存', key: 'balance', width: 12 },
+      { header: '累计入库', key: 'totalIn', width: 12 },
+      { header: '累计出库', key: 'totalOut', width: 12 },
+      { header: '资产估值', key: 'value', width: 15 },
+      { header: '创建人', key: 'creator', width: 12 },
+    ];
+    ws.getRow(1).font = { bold: true };
+    ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } };
+
+    products.forEach(p => {
+      const pid = String(p.id);
+      const pTrans = byProduct.get(pid) || [];
+      const balance = computeBalanceFromList(pTrans);
+      const totalIn = pTrans.filter(t => t.type === 'in').reduce((s, t) => s + t.quantity, 0);
+      const totalOut = pTrans.filter(t => t.type === 'out').reduce((s, t) => s + t.quantity, 0);
+      const price = p.unitPrice || p.unit_price || 0;
+      ws.addRow({
+        name: p.name, sku: p.sku || '', category: p.category || '',
+        unitPrice: price, currency: p.currency || 'CNY',
+        balance, totalIn, totalOut, value: (balance * price).toFixed(2),
+        creator: p.creatorName || p.creator_name || ''
+      });
+    });
+
+    // 汇总行
+    const totalVal = products.reduce((s, p) => {
+      const pTrans = byProduct.get(String(p.id)) || [];
+      return s + computeBalanceFromList(pTrans) * (p.unitPrice || p.unit_price || 0);
+    }, 0);
+    ws.addRow({ name: '合计', value: totalVal.toFixed(2) });
+    ws.lastRow.font = { bold: true };
+
+    const buf = await wb.xlsx.writeBuffer();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="inventory_${new Date().toISOString().slice(0, 10)}.xlsx"`);
+    res.send(Buffer.from(buf));
+  } catch (e) {
+    console.error('Excel导出失败:', e);
+    res.status(500).json({ message: '导出失败: ' + e.message });
+  }
+});
+
+app.get('/api/export/transactions-excel', authenticate, async (req, res) => {
+  try {
+    const { startDate, endDate, type } = req.query;
+    let transactions, products;
+    if (useMySQL) {
+      let sql = 'SELECT * FROM transactions WHERE 1=1';
+      const params = [];
+      if (startDate) { sql += ' AND date >= ?'; params.push(startDate); }
+      if (endDate) { sql += ' AND date <= ?'; params.push(endDate + ' 23:59:59'); }
+      if (type && ['in', 'out'].includes(type)) { sql += ' AND type = ?'; params.push(type); }
+      sql += ' ORDER BY date DESC';
+      transactions = await queryRows(sql, params);
+      products = await queryRows('SELECT * FROM products');
+    } else {
+      let trans = getLocalData().transactions.slice().reverse();
+      if (startDate) trans = trans.filter(t => new Date(t.date) >= new Date(startDate));
+      if (endDate) trans = trans.filter(t => new Date(t.date) <= new Date(endDate + 'T23:59:59'));
+      if (type && ['in', 'out'].includes(type)) trans = trans.filter(t => t.type === type);
+      transactions = trans;
+      products = getLocalData().products;
+    }
+    const prodMap = {};
+    products.forEach(p => { prodMap[String(p.id)] = p; });
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('收发明细表');
+    ws.columns = [
+      { header: '日期', key: 'date', width: 14 },
+      { header: '时间', key: 'time', width: 10 },
+      { header: '产品名称', key: 'prodName', width: 30 },
+      { header: '货号SKU', key: 'sku', width: 18 },
+      { header: '类型', key: 'type', width: 8 },
+      { header: '数量', key: 'quantity', width: 8 },
+      { header: '结算金额', key: 'amount', width: 12 },
+      { header: '客户', key: 'customer', width: 16 },
+      { header: '领用人', key: 'receiver', width: 12 },
+      { header: '批次号', key: 'batchNo', width: 16 },
+      { header: '订单号', key: 'orderNo', width: 16 },
+      { header: '物流号', key: 'logisticsNo', width: 16 },
+      { header: '操作人', key: 'username', width: 12 },
+      { header: '备注', key: 'notes', width: 30 },
+    ];
+    ws.getRow(1).font = { bold: true };
+    ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } };
+
+    transactions.forEach(t => {
+      const d = new Date(t.date);
+      const p = prodMap[String(t.productId || t.product_id)];
+      ws.addRow({
+        date: d.toLocaleDateString('zh-CN'),
+        time: d.toLocaleTimeString('zh-CN'),
+        prodName: p?.name || '',
+        sku: p?.sku || '',
+        type: t.type === 'in' ? '入库' : '出库',
+        quantity: t.quantity,
+        amount: (t.quantity * (p?.unitPrice || p?.unit_price || 0)).toFixed(2),
+        customer: t.customerName || t.customer_name || '',
+        receiver: t.receiver || '',
+        batchNo: t.batchNo || t.batch_no || '',
+        orderNo: t.orderNo || t.order_no || '',
+        logisticsNo: t.logisticsNo || t.logistics_no || '',
+        username: t.username || '',
+        notes: t.notes || ''
+      });
+    });
+
+    const buf = await wb.xlsx.writeBuffer();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="transactions_${new Date().toISOString().slice(0, 10)}.xlsx"`);
+    res.send(Buffer.from(buf));
+  } catch (e) {
+    console.error('Excel导出失败:', e);
+    res.status(500).json({ message: '导出失败: ' + e.message });
+  }
+});
+
+app.get('/api/export/valuation-excel', authenticate, async (req, res) => {
+  try {
+    let products, transactions;
+    if (useMySQL) {
+      products = await queryRows('SELECT * FROM products');
+      transactions = await queryRows('SELECT * FROM transactions');
+    } else {
+      products = getLocalData().products;
+      transactions = getLocalData().transactions;
+    }
+    const byProduct = groupTransactionsByProduct(transactions);
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('产品估值表');
+    ws.columns = [
+      { header: '产品名称', key: 'name', width: 30 },
+      { header: '货号SKU', key: 'sku', width: 18 },
+      { header: '品类', key: 'category', width: 14 },
+      { header: '单价', key: 'unitPrice', width: 12 },
+      { header: '币种', key: 'currency', width: 8 },
+      { header: '当前库存', key: 'balance', width: 12 },
+      { header: '资产估值', key: 'value', width: 15 },
+      { header: '累计入库', key: 'totalIn', width: 12 },
+      { header: '累计出库', key: 'totalOut', width: 12 },
+      { header: '工厂', key: 'factory', width: 16 },
+      { header: '客户', key: 'customer', width: 16 },
+    ];
+    ws.getRow(1).font = { bold: true };
+    ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } };
+
+    let grandTotal = 0;
+    products.forEach(p => {
+      const pid = String(p.id);
+      const pTrans = byProduct.get(pid) || [];
+      const balance = computeBalanceFromList(pTrans);
+      const totalIn = pTrans.filter(t => t.type === 'in').reduce((s, t) => s + t.quantity, 0);
+      const totalOut = pTrans.filter(t => t.type === 'out').reduce((s, t) => s + t.quantity, 0);
+      const price = p.unitPrice || p.unit_price || 0;
+      const val = balance * price;
+      grandTotal += val;
+      ws.addRow({
+        name: p.name, sku: p.sku || '', category: p.category || '',
+        unitPrice: price, currency: p.currency || 'CNY',
+        balance, value: val.toFixed(2), totalIn, totalOut,
+        factory: p.factoryId || '', customer: p.customerName || p.customer_name || ''
+      });
+    });
+    ws.addRow({ name: '总估值', value: grandTotal.toFixed(2) });
+    ws.lastRow.font = { bold: true };
+
+    const buf = await wb.xlsx.writeBuffer();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="valuation_${new Date().toISOString().slice(0, 10)}.xlsx"`);
+    res.send(Buffer.from(buf));
+  } catch (e) {
+    console.error('Excel导出失败:', e);
+    res.status(500).json({ message: '导出失败: ' + e.message });
+  }
+});
+
+// --- 批量导入 ---
+// 模板下载
+app.get('/api/import/template/:type', authenticate, requireNonStaff, async (req, res) => {
+  const type = req.params.type;
+  const wb = new ExcelJS.Workbook();
+  let ws;
+  if (type === 'products') {
+    ws = wb.addWorksheet('产品导入模板');
+    ws.columns = [
+      { header: '产品名称', key: 'name', width: 30 },
+      { header: '货号SKU', key: 'sku', width: 18 },
+      { header: '品类', key: 'category', width: 14 },
+      { header: '单价', key: 'unitPrice', width: 12 },
+      { header: '币种', key: 'currency', width: 8 },
+      { header: '包装规格', key: 'packaging', width: 14 },
+      { header: '产品尺寸', key: 'spec', width: 14 },
+      { header: '材质工艺', key: 'material', width: 14 },
+      { header: '客户名称', key: 'customerName', width: 16 },
+      { header: '备注', key: 'notes', width: 30 },
+    ];
+    ws.addRow({ name: '示例产品A', sku: 'SKU-001', category: '嘴贴', unitPrice: 10.5, currency: 'CNY', packaging: '100片/包', spec: '5x5cm', material: '无纺布', customerName: '', notes: '请删除此行后录入实际数据' });
+  } else if (type === 'transactions') {
+    ws = wb.addWorksheet('流水导入模板');
+    ws.columns = [
+      { header: '产品名称', key: 'prodName', width: 30 },
+      { header: '货号SKU', key: 'sku', width: 18 },
+      { header: '类型(in/out)', key: 'type', width: 12 },
+      { header: '数量', key: 'quantity', width: 8 },
+      { header: '客户', key: 'customerName', width: 16 },
+      { header: '领用人', key: 'receiver', width: 12 },
+      { header: '批次号', key: 'batchNo', width: 16 },
+      { header: '订单号', key: 'orderNo', width: 16 },
+      { header: '物流号', key: 'logisticsNo', width: 16 },
+      { header: '备注', key: 'notes', width: 30 },
+    ];
+    ws.addRow({ prodName: '示例产品A', sku: 'SKU-001', type: 'in', quantity: 100, customerName: '', receiver: '', batchNo: '', orderNo: '', logisticsNo: '', notes: '请删除此行后录入实际数据' });
+  } else {
+    return res.status(400).json({ message: '无效的模板类型' });
+  }
+  ws.getRow(1).font = { bold: true };
+  ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } };
+
+  const buf = await wb.xlsx.writeBuffer();
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="template_${type}.xlsx"`);
+  res.send(Buffer.from(buf));
+});
+
+// 批量导入产品
+const importUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+app.post('/api/import/products', authenticate, requireNonStaff, importUpload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: '请选择文件' });
+  try {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(req.file.buffer);
+    const ws = wb.getWorksheet(1);
+    if (!ws) return res.status(400).json({ message: '文件格式无效' });
+
+    const rows = [];
+    const headers = [];
+    ws.getRow(1).eachCell((cell, col) => { headers[col] = String(cell.value || '').trim(); });
+    ws.eachRow((row, rowNum) => {
+      if (rowNum === 1) return;
+      const obj = {};
+      row.eachCell((cell, col) => { obj[headers[col]] = cell.value; });
+      if (obj['产品名称'] || obj['name']) rows.push(obj);
+    });
+
+    if (rows.length === 0) return res.status(400).json({ message: '文件中无有效数据行' });
+
+    let success = 0, skipped = 0;
+    const errors = [];
+
+    if (useMySQL) {
+      const existingSkus = await queryRows('SELECT sku FROM products WHERE sku IS NOT NULL AND sku != ""');
+      const skuSet = new Set(existingSkus.map(r => r.sku));
+      const conn = await (await getPool()).getConnection();
+      try {
+        await conn.beginTransaction();
+        for (let i = 0; i < rows.length; i++) {
+          const r = rows[i];
+          const name = String(r['产品名称'] || r['name'] || '').trim();
+          if (!name) { errors.push(`第${i + 2}行: 产品名称为空，跳过`); skipped++; continue; }
+          const sku = String(r['货号SKU'] || r['sku'] || '').trim();
+          if (sku && skuSet.has(sku)) { errors.push(`第${i + 2}行: SKU "${sku}" 已存在，跳过`); skipped++; continue; }
+          if (sku) skuSet.add(sku);
+          const id = Date.now().toString() + i;
+          await conn.query(
+            'INSERT INTO products (id, name, sku, category, unit_price, currency, packaging, spec, material, customer_name, notes, created_by, creator_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, name, sku, String(r['品类'] || r['category'] || '').trim(),
+             parseFloat(r['单价'] || r['unitPrice'] || 0), String(r['币种'] || r['currency'] || 'CNY').trim(),
+             String(r['包装规格'] || r['packaging'] || '').trim(), String(r['产品尺寸'] || r['spec'] || '').trim(),
+             String(r['材质工艺'] || r['material'] || '').trim(), String(r['客户名称'] || r['customerName'] || '').trim(),
+             String(r['备注'] || r['notes'] || '').trim(), String(req.user.id), req.user.username]
+          );
+          success++;
+        }
+        await conn.commit();
+      } catch (e) {
+        await conn.rollback();
+        return res.status(500).json({ message: '导入失败，已回滚: ' + e.message });
+      } finally {
+        conn.release();
+      }
+    } else {
+      const db = getLocalData();
+      const skuSet = new Set(db.products.filter(p => p.sku).map(p => p.sku));
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        const name = String(r['产品名称'] || r['name'] || '').trim();
+        if (!name) { errors.push(`第${i + 2}行: 产品名称为空，跳过`); skipped++; continue; }
+        const sku = String(r['货号SKU'] || r['sku'] || '').trim();
+        if (sku && skuSet.has(sku)) { errors.push(`第${i + 2}行: SKU "${sku}" 已存在，跳过`); skipped++; continue; }
+        if (sku) skuSet.add(sku);
+        const id = Date.now().toString() + i;
+        db.products.push({
+          id, name, sku, category: String(r['品类'] || r['category'] || '').trim(),
+          unitPrice: parseFloat(r['单价'] || r['unitPrice'] || 0), currency: String(r['币种'] || r['currency'] || 'CNY').trim(),
+          packaging: String(r['包装规格'] || r['packaging'] || '').trim(), spec: String(r['产品尺寸'] || r['spec'] || '').trim(),
+          material: String(r['材质工艺'] || r['material'] || '').trim(), customerName: String(r['客户名称'] || r['customerName'] || '').trim(),
+          notes: String(r['备注'] || r['notes'] || '').trim(), createdBy: req.user.id, creatorName: req.user.username
+        });
+        success++;
+      }
+      saveLocalData(db);
+    }
+
+    await logAction(req, 'batch_import', 'product', '', `批量导入产品: 成功${success}条, 跳过${skipped}条`);
+    res.json({ message: `导入完成: 成功 ${success} 条, 跳过 ${skipped} 条`, success, skipped, errors: errors.slice(0, 20) });
+  } catch (e) {
+    console.error('批量导入失败:', e);
+    res.status(500).json({ message: '导入失败: ' + e.message });
+  }
+});
+
+// 批量导入流水
+app.post('/api/import/transactions', authenticate, requireNonStaff, importUpload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: '请选择文件' });
+  try {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(req.file.buffer);
+    const ws = wb.getWorksheet(1);
+    if (!ws) return res.status(400).json({ message: '文件格式无效' });
+
+    const rows = [];
+    const headers = [];
+    ws.getRow(1).eachCell((cell, col) => { headers[col] = String(cell.value || '').trim(); });
+    ws.eachRow((row, rowNum) => {
+      if (rowNum === 1) return;
+      const obj = {};
+      row.eachCell((cell, col) => { obj[headers[col]] = cell.value; });
+      if (obj['产品名称'] || obj['prodName']) rows.push(obj);
+    });
+
+    if (rows.length === 0) return res.status(400).json({ message: '文件中无有效数据行' });
+
+    // 获取产品列表用于名称匹配
+    let products;
+    if (useMySQL) products = await queryRows('SELECT * FROM products');
+    else products = getLocalData().products;
+    const prodByName = new Map();
+    const prodBySku = new Map();
+    products.forEach(p => {
+      prodByName.set(p.name, p);
+      if (p.sku) prodBySku.set(p.sku, p);
+    });
+
+    let success = 0, skipped = 0;
+    const errors = [];
+
+    if (useMySQL) {
+      const conn = await (await getPool()).getConnection();
+      try {
+        await conn.beginTransaction();
+        for (let i = 0; i < rows.length; i++) {
+          const r = rows[i];
+          const prodName = String(r['产品名称'] || r['prodName'] || '').trim();
+          const sku = String(r['货号SKU'] || r['sku'] || '').trim();
+          let prod = prodBySku.get(sku) || prodByName.get(prodName);
+          if (!prod) { errors.push(`第${i + 2}行: 产品 "${prodName || sku}" 未找到，跳过`); skipped++; continue; }
+          const type = String(r['类型(in/out)'] || r['type'] || '').trim().toLowerCase();
+          if (!['in', 'out'].includes(type)) { errors.push(`第${i + 2}行: 类型无效，跳过`); skipped++; continue; }
+          const quantity = parseInt(r['数量'] || r['quantity'] || 0);
+          if (isNaN(quantity) || quantity <= 0) { errors.push(`第${i + 2}行: 数量无效，跳过`); skipped++; continue; }
+          const id = Date.now().toString() + i;
+          await conn.query(
+            'INSERT INTO transactions (id, product_id, type, quantity, order_no, logistics_no, customer_name, receiver, batch_no, notes, user_id, username, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [id, String(prod.id), type, quantity, String(r['订单号'] || r['orderNo'] || '').trim(),
+             String(r['物流号'] || r['logisticsNo'] || '').trim(), String(r['客户'] || r['customerName'] || '').trim(),
+             String(r['领用人'] || r['receiver'] || '').trim(), String(r['批次号'] || r['batchNo'] || '').trim(),
+             String(r['备注'] || r['notes'] || '').trim(), String(req.user.id), req.user.username, new Date()]
+          );
+          success++;
+        }
+        await conn.commit();
+      } catch (e) {
+        await conn.rollback();
+        return res.status(500).json({ message: '导入失败，已回滚: ' + e.message });
+      } finally {
+        conn.release();
+      }
+    } else {
+      const db = getLocalData();
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        const prodName = String(r['产品名称'] || r['prodName'] || '').trim();
+        const sku = String(r['货号SKU'] || r['sku'] || '').trim();
+        let prod = prodBySku.get(sku) || prodByName.get(prodName);
+        if (!prod) { errors.push(`第${i + 2}行: 产品 "${prodName || sku}" 未找到，跳过`); skipped++; continue; }
+        const type = String(r['类型(in/out)'] || r['type'] || '').trim().toLowerCase();
+        if (!['in', 'out'].includes(type)) { errors.push(`第${i + 2}行: 类型无效，跳过`); skipped++; continue; }
+        const quantity = parseInt(r['数量'] || r['quantity'] || 0);
+        if (isNaN(quantity) || quantity <= 0) { errors.push(`第${i + 2}行: 数量无效，跳过`); skipped++; continue; }
+        db.transactions.push({
+          id: Date.now().toString() + i, productId: prod.id, type, quantity,
+          orderNo: String(r['订单号'] || r['orderNo'] || '').trim(), logisticsNo: String(r['物流号'] || r['logisticsNo'] || '').trim(),
+          customerName: String(r['客户'] || r['customerName'] || '').trim(), receiver: String(r['领用人'] || r['receiver'] || '').trim(),
+          batchNo: String(r['批次号'] || r['batchNo'] || '').trim(), notes: String(r['备注'] || r['notes'] || '').trim(),
+          userId: req.user.id, username: req.user.username, date: new Date()
+        });
+        success++;
+      }
+      saveLocalData(db);
+    }
+
+    await logAction(req, 'batch_import', 'transaction', '', `批量导入流水: 成功${success}条, 跳过${skipped}条`);
+    res.json({ message: `导入完成: 成功 ${success} 条, 跳过 ${skipped} 条`, success, skipped, errors: errors.slice(0, 20) });
+  } catch (e) {
+    console.error('批量导入失败:', e);
     res.status(500).json({ message: '导入失败: ' + e.message });
   }
 });
