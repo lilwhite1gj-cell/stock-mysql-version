@@ -1448,7 +1448,11 @@ app.post('/api/import/products', authenticate, requireNonStaff, importUpload.sin
     res.json({ message: `导入完成: 成功 ${success} 条, 跳过 ${skipped} 条`, success, skipped, errors: errors.slice(0, 20) });
   } catch (e) {
     console.error('批量导入失败:', e);
-    res.status(500).json({ message: '导入失败: ' + e.message });
+    let msg = e.message || '未知错误';
+    if (/zip|central directory|not a valid/i.test(msg)) {
+      msg = '文件不是有效的 .xlsx 格式，请使用系统模板或另存为 .xlsx 后再导入';
+    }
+    res.status(500).json({ message: '导入失败: ' + msg });
   }
 });
 
@@ -1545,9 +1549,25 @@ app.post('/api/import/transactions', authenticate, requireNonStaff, importUpload
     await logAction(req, 'batch_import', 'transaction', '', `批量导入流水: 成功${success}条, 跳过${skipped}条`);
     res.json({ message: `导入完成: 成功 ${success} 条, 跳过 ${skipped} 条`, success, skipped, errors: errors.slice(0, 20) });
   } catch (e) {
-    console.error('批量导入失败:', e);
-    res.status(500).json({ message: '导入失败: ' + e.message });
+    console.error('批量导入流水失败:', e);
+    let msg = e.message || '未知错误';
+    if (/zip|central directory|not a valid/i.test(msg)) {
+      msg = '文件不是有效的 .xlsx 格式，请使用系统模板或另存为 .xlsx 后再导入';
+    }
+    res.status(500).json({ message: '导入失败: ' + msg });
   }
+});
+
+// 全局错误处理：把 multer 等中间件错误转为前端可读的 JSON，避免返回 HTML 错误页
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ message: '文件过大，单次上传限制 10MB，请拆分后导入' });
+    }
+    return res.status(400).json({ message: '文件上传错误: ' + err.message });
+  }
+  console.error('未捕获错误:', err);
+  res.status(err.status || 500).json({ message: err.message || '服务器内部错误' });
 });
 
 const PORT = process.env.PORT || 5000;
