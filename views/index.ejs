@@ -743,7 +743,13 @@
                     <input type="checkbox" id="isNew" onchange="toggleQuickFields()" class="w-6 h-6 rounded-lg accent-white">
                 </div>
                 <input type="hidden" id="tType">
-                <div id="oldPBox"><select id="tProd" class="w-full bg-slate-100 p-6 rounded-[24px] font-black border-0 outline-none"></select></div>
+                <div id="oldPBox">
+                    <div class="relative">
+                        <input type="text" id="tProdSearch" placeholder="🔍 输入产品名称搜索..." autocomplete="off" class="w-full bg-slate-100 p-6 rounded-[24px] font-black border-0 outline-none" onfocus="renderTProdDropdown()" oninput="onTProdSearchInput()">
+                        <input type="hidden" id="tProd" autocomplete="off">
+                        <div id="tProdDropdown" class="hidden mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 max-h-60 overflow-y-auto z-30"></div>
+                    </div>
+                </div>
                 <div id="newPBox" class="hidden space-y-4 p-6 bg-slate-50 rounded-[32px] border border-indigo-100 shadow-inner">
                     <div class="grid grid-cols-2 gap-3"><select id="qCat" onchange="updateDynamicHints('q')" class="p-5 rounded-2xl bg-white border-0 font-black outline-none"></select><select id="qFact" class="p-5 rounded-2xl bg-white border-0 font-black outline-none"></select></div>
                     <input type="text" id="qCust" list="customerDataList" placeholder="默认客户 (选填，出库时再指定)" class="w-full p-5 rounded-2xl bg-white font-black border-0 outline-none" autocomplete="off">
@@ -952,6 +958,8 @@
         async function register() { const u = getEl('username').value, p = getEl('password').value, ph = getEl('regPhone').value, q = getEl('regQuestion').value, a = getEl('regAnswer').value; if(!u || !p || !ph || !q || !a) return toast('⚠️ 请填写完整注册信息', 'bg-amber-500'); try { await api.post('/register', { username: u, password: p, phone: ph, question: q, answer: a }); toast('✅ 注册成功，欢迎加入', 'bg-emerald-500'); toggleAuth(false); } catch (e) { toast('❌ 注册失败：用户名可能已被占用', 'bg-red-600'); } }
 
         function initApp() {
+            // 产品搜索下拉：点击外部收起（仅注册一次）
+            if (!window._tProdClickBound) { window._tProdClickBound = true; document.addEventListener('click', (e) => { const drop = getEl('tProdDropdown'); const srch = getEl('tProdSearch'); if (!drop || drop.classList.contains('hidden')) return; if (e.target === srch || drop.contains(e.target)) return; drop.classList.add('hidden'); }); }
             if (currentUser) {
                 getEl('page-login').classList.add('hidden'); getEl('app-content').classList.remove('hidden'); getEl('sidebar').classList.remove('-translate-x-full');
                 const bn = getEl('bottomNav'); if(bn) bn.classList.add('visible'); // 显示底部导航栏
@@ -1362,6 +1370,7 @@
                 _selectedProductBalance = -1;
                 getEl('stockHint')?.classList.add('hidden');
                 getEl('stockWarning')?.classList.add('hidden');
+                getEl('tProdDropdown')?.classList.add('hidden');
                 getEl('tProd')?.removeEventListener('change', updateStockHint);
                 getEl('tQty')?.removeEventListener('input', validateStockQty);
                 
@@ -1370,7 +1379,7 @@
                 if(isNew) { isNew.checked = false; toggleQuickFields(); }
                 
                 // 清空基本输入
-                ['tProd', 'tQty', 'tOrder', 'tLog', 'tNotes', 'qName', 'qSku', 'qPrice', 'qPack', 'qSpec', 'qMat', 'qCust', 'qCustAddr', 'qCustPhone', 'tCustomer', 'tReceiver', 'tBatchNo'].forEach(id => {
+                ['tProd', 'tProdSearch', 'tQty', 'tOrder', 'tLog', 'tNotes', 'qName', 'qSku', 'qPrice', 'qPack', 'qSpec', 'qMat', 'qCust', 'qCustAddr', 'qCustPhone', 'tCustomer', 'tReceiver', 'tBatchNo'].forEach(id => {
                     const el = getEl(id); if(el) el.value = '';
                 });
                 
@@ -1769,7 +1778,30 @@
         function openEditModal(id) { const p = products.find(x => x.id === id); getEl('editProdId').value = p.id; ['pName','pSku','pPrice','pPack','pNotes','pCust','pMat','pSpec'].forEach(f => { getEl(f).value = p[f.replace('p', '').toLowerCase()] || ''; }); getEl('pName').value = p.name; getEl('pSku').value = p.sku; getEl('pPrice').value = p.unitPrice; getEl('pPack').value = p.packaging; getEl('pCust').value = p.customerName; const cust = allCustomers.find(c => c.name === p.customerName); getEl('pCustAddr').value = cust ? cust.address : ''; getEl('pCustPhone').value = cust ? cust.phone : ''; getEl('pCat').value = p.category || ''; getEl('pFact').value = p.factoryId || ''; getEl('pCurr').value = p.currency || 'CNY'; getEl('prodModalTitle').innerText = '档案修改'; updateDynamicHints('p'); openModal('prodModal'); }
         function toggleQuickFields() { const isN = getEl('isNew').checked; getEl('oldPBox').classList.toggle('hidden', isN); getEl('newPBox').classList.toggle('hidden', !isN); if(isN) updateDynamicHints('q'); }
         function previewImg(u) { getEl('imgPreviewContent').src = u; getEl('imgPreviewOverlay').classList.remove('hidden'); }
-        function updateProductSelects() { const el = getEl('tProd'); if(el) el.innerHTML = '<option value="" disabled selected>🔍 选择产品...</option>' + products.map(p => `<option value="${p.id}">${esc(p.name)} / ${esc(p.sku)}</option>`).join(''); }
+        function updateProductSelects() { const drop = getEl('tProdDropdown'); if(drop && !drop.classList.contains('hidden')) renderTProdDropdown(); }
+
+        // ===== 产品选择：关键词模糊搜索（名称包含、不区分大小写）=====
+        function renderTProdDropdown() {
+            const drop = getEl('tProdDropdown'); if(!drop) return;
+            const kw = (getEl('tProdSearch').value || '').trim().toLowerCase();
+            const list = kw ? products.filter(p => (p.name || '').toLowerCase().includes(kw)) : products.slice();
+            drop.innerHTML = list.length
+                ? list.map(p => `<button type="button" data-pid="${p.id}" class="w-full text-left px-5 py-3 hover:bg-indigo-50 border-b border-slate-50 last:border-0 flex items-center justify-between gap-3"><span class="font-black text-sm text-slate-700">${esc(p.name)}</span><span class="text-[10px] text-slate-400 font-bold whitespace-nowrap">${esc(p.sku || '')}</span></button>`).join('')
+                : '<div class="p-5 text-center text-xs text-slate-400 font-bold">无匹配产品</div>';
+            drop.classList.remove('hidden');
+            drop.querySelectorAll('button[data-pid]').forEach(b => b.addEventListener('click', () => selectTProd(b.dataset.pid)));
+        }
+        function onTProdSearchInput() {
+            getEl('tProd').value = '';          // 输入即视为重新搜索，清空已选产品
+            renderTProdDropdown();
+        }
+        function selectTProd(pid) {
+            const p = products.find(x => String(x.id) === String(pid)); if(!p) return;
+            getEl('tProd').value = p.id;
+            getEl('tProdSearch').value = `${p.name} / ${p.sku || ''}`;
+            getEl('tProdDropdown').classList.add('hidden');
+            getEl('tProd').dispatchEvent(new Event('change', { bubbles: true })); // 触发出库库存校验
+        }
 
         // --- 版本信息 ---
         let appVersion = '1.1.65';
