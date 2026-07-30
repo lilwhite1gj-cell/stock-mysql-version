@@ -20,7 +20,7 @@ jobs:
         run: |
           PATCH=$(git rev-list --count HEAD)
           MAJOR=1
-          MINOR=1
+          MINOR=2
           VERSION="${MAJOR}.${MINOR}.${PATCH}"
           TODAY=$(date +%Y-%m-%d)
           # 更新 package.json 版本号
@@ -28,8 +28,8 @@ jobs:
           # 更新前端硬编码版本号
           sed -i "s/appVersion = '[^']*'/appVersion = '${VERSION}'/" views/index.ejs
           sed -i "s/id=\"versionBadge\">v[^<]*/id=\"versionBadge\">v${VERSION}/" views/index.ejs
-          # 更新 CHANGELOG.md 最新版本日期
-          sed -i "0,/## \[${VERSION}\] - .*/s//## [${VERSION}] - ${TODAY}/" CHANGELOG.md 2>/dev/null || true
+          # 将更新日志顶部首个版本标题同步为生成的版本号与当天日期（不再要求预先存在对应标题）
+          sed -i "0,/^## \[[0-9]*\.[0-9]*\.[0-9]*\] - [0-9-]*/s//## [${VERSION}] - ${TODAY}/" CHANGELOG.md 2>/dev/null || true
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "✅ 版本号已更新为 v${VERSION}"
 
