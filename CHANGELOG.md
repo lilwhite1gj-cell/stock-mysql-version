@@ -15,6 +15,7 @@
 ### 修复
 - 🐛 库存台账「商品生命周期」不显示流转记录：根因为生产 MySQL 模式下 `GET /api/transactions` 返回的交易记录仅含 `product_id`（蛇形列名），前端详情页按 `t.productId`（驼峰）过滤导致永远匹配不到，生命周期恒为空。已在后端响应中统一补上 `productId` 映射（MySQL: `product_id` → `productId`；JSON: 兜底 `productId ?? product_id`），前端过滤逻辑增加 `?? t.product_id` 兜底。修复后初次入库/出库均能在商品档案全景看板的「全生命周期流转追溯」中正确展示；同时该修复一并修复了收发明细列表与流水详情页（`showTransDetail`）按 `t.productId` 关联产品名的功能（此前在 MySQL 模式下会显示"已删"/"产品已被移除"）
 - 🐛 库存台账「资产价值」列与工厂名在 MySQL 模式下显示异常：前端从 `GET /api/inventory` 读取 `unitPrice`/`factoryId`/`createdBy`/`creatorName`（驼峰），但 MySQL 返回的是 `unit_price`/`factory_id`/`created_by`/`creator_name`（蛇形），导致库存台账资产价值列显示 ¥0、工厂名空白、仪表盘估值归零。已在 `GET /api/inventory` 响应中补充驼峰别名（`unitPrice: unit_price ?? unitPrice` 等），JSON 模式下 `??` 回退到原值无副作用。修复后资产价值、工厂关联、按金额排序均恢复正常
+- 🐛 收发明细录入后产品名显示"已删"：`renderTrans` 直接依赖全局 `products` 数组，但用户从非台账/仪表盘页直接进入收发明细或刷新页面时 `products` 尚未加载，导致 `products.find` 取不到产品而 fallback 为"已删"。已在 `renderTrans` 开头增加兜底逻辑：若 `products` 为空则自动请求 `/inventory` 加载产品数据后再渲染；同时后端 `GET /api/transactions` 的 `productId` 映射增加空值保护，避免 `product_id` 为空时生成 `"null"`/`"undefined"` 字符串。修复后无论从何页面进入，收发明细列表与录入后均正确显示产品名称
 
 ## [1.2.0] - 2026-07-29
 
