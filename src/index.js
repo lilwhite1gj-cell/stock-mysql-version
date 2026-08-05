@@ -72,7 +72,8 @@ const getLocalData = () => {
       transactions: data.transactions || [],
       categories: data.categories || ['嘴贴', '鼻贴', '样品'],
       factories: data.factories || [],
-      customers: data.customers || []
+      customers: data.customers || [],
+      auditLogs: data.auditLogs || []
     };
   } catch (e) { return { users: [], products: [], transactions: [], categories: ['嘴贴', '鼻贴', '样品'], factories: [], customers: [] }; }
 };
@@ -451,8 +452,9 @@ app.get('/api/transactions', authenticate, async (req, res) => {
   if (useMySQL) {
     let sql = 'SELECT * FROM transactions WHERE 1=1';
     const params = [];
-    // 视图范围：self=仅当前用户流水，all=全部用户流水（默认 self）
-    if (scope !== 'all') { sql += ' AND user_id = ?'; params.push(String(req.user.id)); }
+    // 视图范围：self=仅当前用户流水，all=全部用户流水（默认 self；仅 admin/manager 可查看全部）
+    const canViewAllTrans = req.user.role === 'admin' || req.user.role === 'manager';
+    if (!canViewAllTrans || scope !== 'all') { sql += ' AND user_id = ?'; params.push(String(req.user.id)); }
     if (startDate) { sql += ' AND date >= ?'; params.push(startDate); }
     if (endDate) { sql += ' AND date <= ?'; params.push(endDate + ' 23:59:59'); }
     if (type && ['in', 'out'].includes(type)) { sql += ' AND type = ?'; params.push(type); }
@@ -471,7 +473,8 @@ app.get('/api/transactions', authenticate, async (req, res) => {
     }));
   } else {
     let trans = getLocalData().transactions.slice().reverse();
-    if (scope !== 'all') trans = trans.filter(t => String(t.userId || t.user_id) === String(req.user.id));
+    const canViewAllTrans = req.user.role === 'admin' || req.user.role === 'manager';
+    if (!canViewAllTrans || scope !== 'all') trans = trans.filter(t => String(t.userId || t.user_id) === String(req.user.id));
     if (startDate) trans = trans.filter(t => new Date(t.date) >= new Date(startDate));
     if (endDate) trans = trans.filter(t => new Date(t.date) <= new Date(endDate + 'T23:59:59'));
     if (type && ['in', 'out'].includes(type)) trans = trans.filter(t => t.type === type);

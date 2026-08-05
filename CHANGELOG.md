@@ -12,6 +12,17 @@
 ### 修复
 - 🐛 收发明细/商品详情 `productId` 恒为空导致所有交易显示"已删"、商品生命周期空白：根因是 `src/db-mysql.js` 的 `queryRows` 已对 MySQL 查询结果执行 snake→camel 转换（`product_id`→`productId`），但 `GET /api/transactions` 响应映射里却裸写 `productId: t.product_id ? ... : ''`，在 camelCase 返回下 `t.product_id` 恒为 `undefined`，使 `productId` 恒为 `''`，前端 `products.find(x => x.id === t.productId)` 永远匹配不到。已改为 `productId: String(t.productId ?? t.product_id ?? '')`（与 JSON 分支一致），并全量核查其余 snake 字段引用均带驼峰兜底，确认无同类隐患。此修复同时解决了此前同类问题（商品生命周期不显示、流水详情显示"产品已被移除"）
 
+### 优化
+- 🎨 库存台账产品名称完整可见：表头列宽重排（名称 16%→28%，其余压缩），表格行与移动端卡片产品名由 `truncate` 改为 `break-words` 自动换行，超长名称不再被省略号截断
+- 🎨 库存台账「参数（品类/尺寸/材质）」列的尺寸/材质标签由 `truncate` 改为 `break-words` 换行显示，长尺寸不再被截断
+- 🎨 收发明细录入页：商品搜索下拉的每个选项追加「尺寸」徽章；选中已有商品后在信息框展示品类/尺寸/材质，便于区分同名不同尺寸商品
+- 🎨 流水详情页：关联产品档案块下新增「业务品类 / 产品尺寸 / 材质工艺 / 货号 SKU」四列信息卡，商品名改为换行不截断
+- 🎨 产品档案全景看板（showInvDetail）：新增「档案规格参数」网格（产品品类 / 尺寸 / 材质工艺 / 货号 SKU / 所属工厂 / 关联客户 / 计价单价 / 计价币种），看板标题长名称不再截断
+
+### 修复
+- 🐛 管理员/经理查看他人录入的流水报"流水记录不存在，请刷新页面"：`showTransDetail` 与 `showInvDetail` 拉取流水时，admin/manager 改传 `?scope=all`，普通 staff 仍走默认 self；后端 `GET /api/transactions` 增加角色校验，仅 admin/manager 可真正使用 `scope=all`，staff 越权传参也被强制过滤为仅本人，杜绝权限绕过
+- 🐛 修复录入弹窗关闭时控制台报 "Reset Modal Error"：`resetTransModal` 误将隐藏 input `tType` 当作 `<select>` 重置（`el.options[0]` 抛错），已将其从 select 复位循环排除并补全 value 清空；同时 `getLocalData` 增加 `auditLogs` 默认值防御
+
 ## [1.2.89] - 2026-07-30
 
 ### 新增

@@ -516,12 +516,12 @@
                         <table class="w-full text-left border-collapse table-fixed min-w-[1000px]">
                             <thead class="bg-slate-50/50 border-b border-slate-100">
                                 <tr>
-                                    <th class="w-[16%] p-8 text-xs font-black text-slate-600 uppercase tracking-widest">产品名称</th>
-                                    <th class="w-[16%] p-8 text-xs font-black text-slate-600 uppercase tracking-widest text-center">参数 (品类/尺寸/材质)</th>
-                                    <th class="w-[16%] p-8 text-xs font-black text-slate-600 uppercase tracking-widest text-center">维度 (客户/工厂)</th>
-                                    <th class="w-[18%] p-8 text-xs font-black text-slate-600 uppercase tracking-widest text-center">计价/库存</th>
-                                    <th class="w-[12%] p-8 text-xs font-black text-slate-600 uppercase tracking-widest text-center">最后变动经办</th>
-                                    <th class="w-[22%] p-8 text-right text-xs font-black text-slate-600 uppercase tracking-widest">资产总额 (实时)</th>
+                                    <th class="w-[28%] p-8 text-xs font-black text-slate-600 uppercase tracking-widest">产品名称</th>
+                                    <th class="w-[14%] p-8 text-xs font-black text-slate-600 uppercase tracking-widest text-center">参数 (品类/尺寸/材质)</th>
+                                    <th class="w-[14%] p-8 text-xs font-black text-slate-600 uppercase tracking-widest text-center">维度 (客户/工厂)</th>
+                                    <th class="w-[16%] p-8 text-xs font-black text-slate-600 uppercase tracking-widest text-center">计价/库存</th>
+                                    <th class="w-[10%] p-8 text-xs font-black text-slate-600 uppercase tracking-widest text-center">最后变动经办</th>
+                                    <th class="w-[18%] p-8 text-right text-xs font-black text-slate-600 uppercase tracking-widest">资产总额 (实时)</th>
                                 </tr>
                             </thead>
                             <tbody id="invTable" class="divide-y divide-slate-50"></tbody>
@@ -909,6 +909,7 @@
                         <input type="text" id="tProdSearch" placeholder="🔍 输入产品名称搜索..." autocomplete="off" class="w-full bg-slate-100 p-6 rounded-[24px] font-black border-0 outline-none" onfocus="renderTProdDropdown()" oninput="onTProdSearchInput()">
                         <input type="hidden" id="tProd" autocomplete="off">
                         <div id="tProdDropdown" class="hidden mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 max-h-60 overflow-y-auto z-30"></div>
+                        <div id="tProdInfo" class="hidden mt-3 p-4 bg-indigo-50/70 border border-indigo-100 rounded-2xl flex flex-wrap items-center gap-2 text-xs font-black"></div>
                     </div>
                 </div>
                 <div id="newPBox" class="hidden space-y-4 p-6 bg-slate-50 rounded-[32px] border border-indigo-100 shadow-inner">
@@ -1221,8 +1222,8 @@
                     const fact = allFactories.find(f => f.id === p.factoryId); const isAdmin = currentUser.role !== 'staff';
                     const actBtns = isAdmin ? `<div class="flex space-x-2 mt-2"><button onclick="event.stopPropagation(); openEditModal('${p.id}')" class="p-2 text-indigo-400 hover:bg-indigo-50 rounded-lg transition-colors"><i data-lucide="edit-3" class="w-4 h-4"></i></button><button onclick="event.stopPropagation(); doDeleteProduct('${p.id}')" class="p-2 text-rose-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>` : '';
                     const catTag = `<span class="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md text-xs font-black uppercase border border-indigo-100">${esc(p.category || '默认')}</span>`;
-                    const specTag = p.spec ? `<span class="px-2 py-0.5 bg-slate-50 text-slate-600 rounded-md text-xs font-black border border-slate-200 mt-1 block truncate max-w-[100px]">${esc(p.spec)}</span>` : '';
-                    const matTag = p.material ? `<span class="px-2 py-0.5 bg-slate-50 text-slate-600 rounded-md text-xs font-black border border-slate-200 mt-1 block truncate max-w-[100px]">${esc(p.material)}</span>` : '';
+                    const specTag = p.spec ? `<span class="px-2 py-0.5 bg-slate-50 text-slate-600 rounded-md text-xs font-black border border-slate-200 mt-1 block break-words whitespace-normal max-w-full text-center">${esc(p.spec)}</span>` : '';
+                    const matTag = p.material ? `<span class="px-2 py-0.5 bg-slate-50 text-slate-600 rounded-md text-xs font-black border border-slate-200 mt-1 block break-words whitespace-normal max-w-full text-center">${esc(p.material)}</span>` : '';
                     const custTag = canSeeProductCustomer(p) && p.customerName ? `<span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-xs font-black border border-slate-200 mt-1 block truncate max-w-[100px]">${esc(p.customerName)}</span>` : (p.customerRestricted ? `<span class="px-2 py-0.5 bg-slate-50 text-slate-400 rounded-md text-xs font-black border border-slate-200 mt-1 block truncate max-w-[100px]">🔒 受限</span>` : '');
                     const factTag = fact ? `<span class="px-2 py-0.5 bg-amber-50 text-amber-600 rounded-md text-xs font-black border border-amber-100 mt-1 block truncate max-w-[100px]">${esc(fact.name)}</span>` : '';
                     return `<tr class="hover:bg-slate-50 transition-all clickable-row group" onclick="showInvDetail('${p.id}')">
@@ -1232,7 +1233,7 @@
                                     <img src="${esc(p.image || '')}" class="w-full h-full rounded-xl object-cover bg-slate-100 shadow-sm border-2 border-white" onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27150%27 height=%27150%27 viewBox=%270 0 150 150%27%3E%3Crect fill=%27%23f1f5f9%27 width=%27150%27 height=%27150%27/%3E%3Ctext x=%2775%27 y=%2780%27 text-anchor=%27middle%27 fill=%27%2394a3b8%27 font-size=%2712%27 font-family=%27sans-serif%27%3ENO IMAGE%3C/text%3E%3C/svg%3E'">
                                 </div>
                                 <div class="min-w-0">
-                                    <div class="font-black text-sm text-slate-800 truncate">${esc(p.name)}</div>
+                                    <div class="font-black text-sm text-slate-800 break-words leading-snug">${esc(p.name)}</div>
                                     <div class="text-xs text-slate-500 font-mono tracking-widest uppercase truncate">${esc(p.sku)}</div>
                                     ${p.notes ? `<div class="text-xs text-amber-700 font-black mt-1 truncate max-w-[150px] italic bg-amber-50 px-1 rounded-sm">备注: ${esc(p.notes)}</div>` : ''}
                                     ${actBtns}
@@ -1274,7 +1275,7 @@
                                     <img src="${esc(p.image || '')}" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27150%27 height=%27150%27 viewBox=%270 0 150 150%27%3E%3Crect fill=%27%23f1f5f9%27 width=%27150%27 height=%27150%27/%3E%3Ctext x=%2775%27 y=%2780%27 text-anchor=%27middle%27 fill=%27%2394a3b8%27 font-size=%2712%27 font-family=%27sans-serif%27%3E无图%3C/text%3E%3C/svg%3E'">
                                 </div>
                                 <div class="min-w-0">
-                                    <div class="font-black text-slate-800 text-lg leading-tight truncate">${esc(p.name)}</div>
+                                    <div class="font-black text-slate-800 text-lg leading-tight break-words">${esc(p.name)}</div>
                                     <div class="text-xs text-slate-500 font-mono mt-1 uppercase tracking-widest">${esc(p.sku)}</div>
                                     ${p.notes ? `<div class="text-xs text-amber-700 font-black mt-1 truncate max-w-[150px] italic bg-amber-50 px-1 rounded-sm">备注: ${esc(p.notes)}</div>` : ''}
                                 </div>
@@ -1363,7 +1364,8 @@
                                 <span class="text-xs font-black text-slate-500 tracking-widest uppercase">${new Date(t.date).toLocaleDateString()}</span>
                                 ${customerTag}${receiverTag}${batchTag}${operatorTag}
                             </div>
-                            <h4 class="text-base md:text-lg font-black truncate text-slate-800 tracking-tighter">${esc(p ? p.name : '已删')}</h4>
+                            <h4 class="text-base md:text-lg font-black text-slate-800 tracking-tighter break-words">${esc(p ? p.name : '已删')}</h4>
+                            ${p && p.spec ? `<p class="text-xs font-bold text-indigo-500 mt-0.5">尺寸: ${esc(p.spec)}</p>` : ''}
                             <div class="flex items-center justify-between mt-2">
                                 <div class="text-xs font-black text-slate-900">${formatMoney(t.quantity * (p?.unitPrice || 0), p?.currency)}</div>
                                 <div class="text-sm font-black ${isIn ? 'text-emerald-600' : 'text-rose-600'}">${isIn ? '+' : '-'}${t.quantity} Bags</div>
@@ -1563,7 +1565,7 @@
                 if(isNew) { isNew.checked = false; toggleQuickFields(); }
                 
                 // 清空基本输入
-                ['tProd', 'tProdSearch', 'tQty', 'tOrder', 'tLog', 'tNotes', 'qName', 'qSku', 'qPrice', 'qPack', 'qSpec', 'qMat', 'qCust', 'qCustAddr', 'qCustPhone', 'tCustomer', 'tReceiver', 'tBatchNo'].forEach(id => {
+                ['tType', 'tProd', 'tProdSearch', 'tQty', 'tOrder', 'tLog', 'tNotes', 'qName', 'qSku', 'qPrice', 'qPack', 'qSpec', 'qMat', 'qCust', 'qCustAddr', 'qCustPhone', 'tCustomer', 'tReceiver', 'tBatchNo'].forEach(id => {
                     const el = getEl(id); if(el) el.value = '';
                 });
                 
@@ -1572,9 +1574,9 @@
                     const el = getEl(id); if(el) el.value = '';
                 });
                 
-                // 重置 Select 默认值
-                ['tType', 'qCurr', 'qCat', 'qFact'].forEach(id => {
-                    const el = getEl(id); if(el && el.options[0]) el.selectedIndex = 0;
+                // 重置 Select 默认值（tType 为隐藏 input，已在上面清空，此处排除）
+                ['qCurr', 'qCat', 'qFact'].forEach(id => {
+                    const el = getEl(id); if(el && el.options && el.options[0]) el.selectedIndex = 0;
                 });
             } catch (e) { console.error('Reset Modal Error:', e); }
         }
@@ -1708,9 +1710,15 @@
             if(!p) return toast('⚠️ 产品数据不存在，请刷新页面', 'bg-amber-500');
             const fact = allFactories.find(f => f.id === p.factoryId);
             getEl('detailTitle').innerText = '产品档案全景看板';
+            const infoCard = (label, value, opts = {}) => `
+                <div class="p-5 bg-white rounded-3xl border border-slate-100 shadow-sm">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">${label}</p>
+                    <p class="text-sm font-black text-slate-800 break-words leading-snug ${opts.mono ? 'font-mono tracking-wider' : ''}">${value}</p>
+                </div>`;
             
-            // 实时获取该产品的所有流水记录
-            const transRes = await api.get('/transactions');
+            // 实时获取该产品的所有流水记录（admin/manager 看全部，staff 只看自己）
+            const scopeParam = (currentUser.role === 'admin' || currentUser.role === 'manager') ? '?scope=all' : '';
+            const transRes = await api.get('/transactions' + scopeParam);
             const pTrans = transRes.data.filter(t => String(t.productId ?? t.product_id) === String(id)).sort((a,b) => new Date(b.date) - new Date(a.date));
             
             const totalIn = pTrans.filter(t => t.type === 'in').reduce((s,t) => s + t.quantity, 0);
@@ -1743,7 +1751,7 @@
                     <img src="${esc(p.image||'')}" class="w-40 h-40 rounded-[32px] object-cover shadow-2xl border-4 border-white flex-shrink-0" onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27150%27 height=%27150%27 viewBox=%270 0 150 150%27%3E%3Crect fill=%27%23f1f5f9%27 width=%27150%27 height=%27150%27/%3E%3Ctext x=%2775%27 y=%2780%27 text-anchor=%27middle%27 fill=%27%2394a3b8%27 font-size=%2712%27 font-family=%27sans-serif%27%3ENO IMAGE%3C/text%3E%3C/svg%3E'">
                     <div class="text-center md:text-left min-w-0">
                         <div class="inline-block px-3 py-1 bg-indigo-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest mb-3">${esc(p.category || '未分类')}</div>
-                        <h4 class="text-3xl md:text-4xl font-black text-slate-800 tracking-tighter leading-tight mb-2 truncate">${esc(p.name)}</h4>
+                        <h4 class="text-3xl md:text-4xl font-black text-slate-800 tracking-tighter leading-tight mb-2 break-words">${esc(p.name)}</h4>
                         <p class="text-slate-400 font-mono tracking-[0.3em] uppercase text-sm">${esc(p.sku)}</p>
                     </div>
                 </div>
@@ -1762,6 +1770,21 @@
                             <div><p class="text-[8px] text-emerald-100/50 font-black uppercase">入库总计</p><p class="text-xl font-black">${totalIn}</p></div>
                             <div><p class="text-[8px] text-emerald-100/50 font-black uppercase">出库总计</p><p class="text-xl font-black">${totalOut}</p></div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- 档案规格参数 -->
+                <div>
+                    <h5 class="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 px-2">档案规格参数</h5>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        ${infoCard('产品品类', esc(p.category || '未分类'))}
+                        ${infoCard('产品尺寸', esc(p.spec || '—'))}
+                        ${infoCard('材质工艺', esc(p.material || '—'))}
+                        ${infoCard('货号 SKU', esc(p.sku || '—'), { mono: true })}
+                        ${infoCard('所属工厂', esc(fact ? fact.name : '未指派'))}
+                        ${infoCard('关联客户', p.customerRestricted ? '🔒 受限' : esc((canSeeProductCustomer(p) && p.customerName) ? p.customerName : '—'))}
+                        ${infoCard('计价单价', formatMoney(p.unitPrice, p.currency))}
+                        ${infoCard('计价币种', esc(p.currency || 'CNY'))}
                     </div>
                 </div>
 
@@ -1786,7 +1809,8 @@
         }
 
         function showTransDetail(id) {
-            api.get('/transactions').then(res => {
+            const scopeParam = (currentUser.role === 'admin' || currentUser.role === 'manager') ? '?scope=all' : '';
+            api.get('/transactions' + scopeParam).then(res => {
                 const t = res.data.find(x => x.id === id);
                 if(!t) return toast('⚠️ 流水记录不存在，请刷新页面', 'bg-amber-500');
                 const p = products.find(x => x.id === t.productId); 
@@ -1800,8 +1824,15 @@
                     </div>
                     <div class="flex items-center gap-6 p-6 bg-slate-50 rounded-[32px] border border-slate-100">
                         <img src="${esc(p?.image||'')}" class="w-20 h-20 rounded-2xl object-cover shadow-lg border-2 border-white" onerror="this.onerror=null;this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27150%27 height=%27150%27 viewBox=%270 0 150 150%27%3E%3Crect fill=%27%23f1f5f9%27 width=%27150%27 height=%27150%27/%3E%3Ctext x=%2775%27 y=%2780%27 text-anchor=%27middle%27 fill=%27%2394a3b8%27 font-size=%2712%27 font-family=%27sans-serif%27%3EN/A%3C/text%3E%3C/svg%3E'">
-                        <div class="min-w-0"><p class="text-xs font-black text-slate-500 uppercase tracking-widest">关联产品档案</p><h4 class="text-2xl font-black text-slate-800 tracking-tighter truncate">${esc(p ? p.name : '产品已被移除')}</h4><p class="text-xs font-mono text-slate-400 tracking-widest">${esc(p?.sku || 'UNKNOWN')}</p></div>
+                        <div class="min-w-0"><p class="text-xs font-black text-slate-500 uppercase tracking-widest">关联产品档案</p><h4 class="text-2xl font-black text-slate-800 tracking-tighter break-words">${esc(p ? p.name : '产品已被移除')}</h4><p class="text-xs font-mono text-slate-400 tracking-widest">${esc(p?.sku || 'UNKNOWN')}</p></div>
                     </div>
+                    ${p ? `
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="glass-card p-5 shadow-sm"><p class="text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">业务品类</p><p class="text-lg font-black text-slate-800 break-words">${esc(p.category || '未分类')}</p></div>
+                        <div class="glass-card p-5 shadow-sm"><p class="text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">产品尺寸</p><p class="text-lg font-black text-indigo-600 break-words">${esc(p.spec || '—')}</p></div>
+                        <div class="glass-card p-5 shadow-sm"><p class="text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">材质工艺</p><p class="text-lg font-black text-slate-800 break-words">${esc(p.material || '—')}</p></div>
+                        <div class="glass-card p-5 shadow-sm"><p class="text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">货号 SKU</p><p class="text-lg font-black text-slate-800 break-words font-mono">${esc(p.sku || '—')}</p></div>
+                    </div>` : ''}
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="glass-card p-8 shadow-sm flex justify-between items-center">
                             <div><p class="text-[10px] font-black text-slate-400 uppercase mb-2">变动数量 (Bags)</p><p class="text-5xl font-black ${isIn?'text-emerald-600':'text-rose-600'} tracking-tighter">${isIn?'+':'-'}${t.quantity.toLocaleString()}</p></div>
@@ -2159,13 +2190,14 @@
             const kw = (getEl('tProdSearch').value || '').trim().toLowerCase();
             const list = kw ? products.filter(p => (p.name || '').toLowerCase().includes(kw)) : products.slice();
             drop.innerHTML = list.length
-                ? list.map(p => `<button type="button" data-pid="${p.id}" class="w-full text-left px-5 py-3 hover:bg-indigo-50 border-b border-slate-50 last:border-0 flex items-center justify-between gap-3"><span class="font-black text-sm text-slate-700">${esc(p.name)}</span><span class="text-[10px] text-slate-400 font-bold whitespace-nowrap">${esc(p.sku || '')}</span></button>`).join('')
+                ? list.map(p => `<button type="button" data-pid="${p.id}" class="w-full text-left px-5 py-3 hover:bg-indigo-50 border-b border-slate-50 last:border-0 flex items-center justify-between gap-3"><span class="font-black text-sm text-slate-700 break-words">${esc(p.name)}</span><span class="flex items-center gap-2 whitespace-nowrap">${p.spec ? `<span class="text-[10px] text-indigo-600 font-black bg-indigo-50 px-2 py-0.5 rounded-md">尺寸:${esc(p.spec)}</span>` : ''}<span class="text-[10px] text-slate-400 font-bold">${esc(p.sku || '')}</span></span></button>`).join('')
                 : '<div class="p-5 text-center text-xs text-slate-400 font-bold">无匹配产品</div>';
             drop.classList.remove('hidden');
             drop.querySelectorAll('button[data-pid]').forEach(b => b.addEventListener('click', () => selectTProd(b.dataset.pid)));
         }
         function onTProdSearchInput() {
             getEl('tProd').value = '';          // 输入即视为重新搜索，清空已选产品
+            getEl('tProdInfo')?.classList.add('hidden');
             renderTProdDropdown();
         }
         function selectTProd(pid) {
@@ -2173,6 +2205,15 @@
             getEl('tProd').value = p.id;
             getEl('tProdSearch').value = `${p.name} / ${p.sku || ''}`;
             getEl('tProdDropdown').classList.add('hidden');
+            // 展示已选商品的尺寸/品类/材质，便于同名不同尺寸商品精确辨认
+            const info = getEl('tProdInfo');
+            if (info) {
+                info.innerHTML = `<span class="text-indigo-600">已选商品档案</span>`
+                    + `<span class="px-2 py-1 bg-white text-slate-700 rounded-lg border border-indigo-100">品类: ${esc(p.category || '未分类')}</span>`
+                    + `<span class="px-2 py-1 bg-white text-indigo-700 rounded-lg border border-indigo-100">尺寸: ${esc(p.spec || '—')}</span>`
+                    + `<span class="px-2 py-1 bg-white text-slate-700 rounded-lg border border-indigo-100">材质: ${esc(p.material || '—')}</span>`;
+                info.classList.remove('hidden');
+            }
             getEl('tProd').dispatchEvent(new Event('change', { bubbles: true })); // 触发出库库存校验
         }
 
