@@ -23,7 +23,7 @@
 - 🐛 管理员/经理查看他人录入的流水报"流水记录不存在，请刷新页面"：`showTransDetail` 与 `showInvDetail` 拉取流水时，admin/manager 改传 `?scope=all`，普通 staff 仍走默认 self；后端 `GET /api/transactions` 增加角色校验，仅 admin/manager 可真正使用 `scope=all`，staff 越权传参也被强制过滤为仅本人，杜绝权限绕过
 - 🐛 修复录入弹窗关闭时控制台报 "Reset Modal Error"：`resetTransModal` 误将隐藏 input `tType` 当作 `<select>` 重置（`el.options[0]` 抛错），已将其从 select 复位循环排除并补全 value 清空；同时 `getLocalData` 增加 `auditLogs` 默认值防御
 
-## [1.2.89] - 2026-07-30
+## [1.2.91] - 2026-08-05
 
 ### 新增
 - 🔀 收发明细视图范围切换：收发明细页新增"视图范围"分段切换控件，支持两种模式——「仅自己」（默认，仅展示当前登录用户的业务流水）与「全部」（展示系统内全部用户的业务流水）。切换即时生效，无需刷新页面；默认选中"仅自己"，既有字段展示与排序方式保持不变，仅按所选模式过滤数据范围。后端 `GET /api/transactions` 新增 `scope` 参数（`self`/`all`），MySQL 与本地 JSON 双模式均已支持
