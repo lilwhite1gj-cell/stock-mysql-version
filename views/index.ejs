@@ -82,6 +82,23 @@
         /* 移动端底部导航栏 */
         .bottom-nav { display: none; }
         .bottom-nav.visible { display: flex; }
+
+        /* 自定义环形图图例 + 扇区弹层：全局作用域（移动端/桌面端通用），替代 Chart.js 内置底部图例，避免多产品时换行重叠 */
+        .dash-legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px 10px; margin-top: 0.875rem; }
+        .dash-legend-item { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 12px; background: rgba(241,245,249,0.6); cursor: pointer; transition: background .15s, transform .15s; min-width: 0; }
+        .dash-legend-item:active { background: rgba(99,102,241,0.12); transform: scale(0.97); }
+        .dash-legend-item.is-active { background: rgba(99,102,241,0.16); box-shadow: inset 0 0 0 1px rgba(99,102,241,0.4); }
+        .dash-legend-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+        .dash-legend-name { font-size: 11px; font-weight: 800; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
+        .dash-legend-pct { font-size: 11px; font-weight: 800; color: #94a3b8; flex-shrink: 0; margin-left: 2px; }
+        .dash-legend-empty { font-size: 11px; color: #94a3b8; padding: 6px 4px; }
+        /* 点击扇区弹出的产品信息浮层（触摸友好） */
+        .chart-popup { position: absolute; z-index: 50; max-width: 78%; padding: 10px 14px; border-radius: 16px; background: rgba(15,23,42,0.92); color: #fff; box-shadow: 0 12px 30px rgba(15,23,42,0.35); backdrop-filter: blur(6px); transform: translate(-50%, -120%); transition: opacity .18s ease; pointer-events: auto; }
+        .chart-popup .cp-name { font-size: 13px; font-weight: 900; line-height: 1.25; word-break: break-word; }
+        .chart-popup .cp-val { font-size: 12px; font-weight: 700; margin-top: 3px; opacity: 0.85; }
+        .chart-popup .cp-pct { display: inline-block; margin-top: 4px; font-size: 10px; font-weight: 800; padding: 1px 7px; border-radius: 999px; background: rgba(255,255,255,0.16); }
+        .chart-popup::after { content: ''; position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); border: 6px solid transparent; border-top-color: rgba(15,23,42,0.92); }
+
         @media (max-width: 768px) {
             .bottom-nav.visible {
                 display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
@@ -471,8 +488,8 @@
                     <div class="flex items-center justify-between"><h2 class="text-4xl font-black text-slate-900 tracking-tighter">业务大盘</h2><span id="perfTag" class="px-4 py-1.5 bg-white/80 border border-slate-200/60 text-slate-400 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm backdrop-blur-sm"></span></div>
                     <div class="grid grid-cols-2 lg:grid-cols-4 gap-5" id="statCards"></div>
                     <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                        <div class="glass-card p-8 chart-card-mobile"><h3 class="text-xl font-black mb-8 text-slate-700 text-center">产品数量占比</h3><div class="h-[300px] md:h-[400px] chart-doughnut-wrap md:max-w-none md:aspect-auto"><canvas id="productQtyChart"></canvas></div></div>
-                        <div class="glass-card p-8 chart-card-mobile"><h3 class="text-xl font-black mb-8 text-slate-700 text-center">资产价值分布</h3><div class="h-[300px] md:h-[400px] chart-doughnut-wrap md:max-w-none md:aspect-auto"><canvas id="productValueChart"></canvas></div></div>
+                        <div class="glass-card p-8 chart-card-mobile"><h3 class="text-xl font-black mb-8 text-slate-700 text-center">产品数量占比</h3><div class="h-[300px] md:h-[400px] chart-doughnut-wrap md:max-w-none md:aspect-auto"><canvas id="productQtyChart"></canvas></div><div class="dash-legend" id="qtyLegend"></div></div>
+                        <div class="glass-card p-8 chart-card-mobile"><h3 class="text-xl font-black mb-8 text-slate-700 text-center">资产价值分布</h3><div class="h-[300px] md:h-[400px] chart-doughnut-wrap md:max-w-none md:aspect-auto"><canvas id="productValueChart"></canvas></div><div class="dash-legend" id="valueLegend"></div></div>
                     </div>
                     <div class="glass-card p-8 chart-card-mobile"><h3 class="text-xl font-black mb-8 flex items-center text-slate-700 justify-center"><i data-lucide="beaker" class="mr-3 text-amber-500"></i>样品库实时存量 (包)</h3><div class="h-[350px] md:h-[500px]"><canvas id="sampleQtyChart"></canvas></div></div>
                     <div class="admin-only hidden glass-card p-8"><h3 class="text-xl font-black mb-8 text-slate-700 flex items-center justify-center"><i data-lucide="award" class="mr-3 text-orange-400"></i>员工贡献榜</h3><div id="perfList" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div></div>
@@ -510,7 +527,21 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="md:col-span-3 flex items-center space-x-3 bg-white/90 backdrop-blur-sm px-6 py-4 rounded-[22px] shadow-sm border border-slate-100/80 self-end md:self-start"><span class="text-xs font-black text-slate-600 uppercase tracking-widest">Sort By:</span><select id="invSortField" onchange="renderInventory()" class="bg-transparent outline-none font-black text-sm text-indigo-600"><option value="id">录入时间</option><option value="name">产品名称</option><option value="customerName">客户维度</option><option value="balance">库存量</option><option value="value">资产价值</option></select></div>
+                        <div class="md:col-span-3 flex items-center space-x-3 bg-white/90 backdrop-blur-sm px-6 py-4 rounded-[22px] shadow-sm border border-slate-100/80 self-end md:self-start flex-wrap gap-y-3">
+                            <span class="text-xs font-black text-slate-600 uppercase tracking-widest">分类维度:</span>
+                            <div class="flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded-xl">
+                                <span class="text-xs font-black text-slate-500 uppercase tracking-widest">品类</span>
+                                <select id="invCatFilter" onchange="renderInventory()" class="bg-transparent outline-none font-black text-sm text-indigo-600"><option value="all">全部品类</option></select>
+                            </div>
+                            <div class="flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded-xl">
+                                <span class="text-xs font-black text-slate-500 uppercase tracking-widest">分组显示</span>
+                                <select id="invGroupBy" onchange="renderInventory()" class="bg-transparent outline-none font-black text-sm text-indigo-600"><option value="none">不分组</option><option value="category">按品类分组</option></select>
+                            </div>
+                            <div class="flex items-center space-x-2 ml-auto bg-slate-50 px-3 py-1.5 rounded-xl">
+                                <span class="text-xs font-black text-slate-600 uppercase tracking-widest">排序</span>
+                                <select id="invSortField" onchange="renderInventory()" class="bg-transparent outline-none font-black text-sm text-indigo-600"><option value="id">录入时间</option><option value="name">产品名称</option><option value="customerName">客户维度</option><option value="balance">库存量</option><option value="value">资产价值</option></select>
+                            </div>
+                        </div>
                     </div>
                     <div class="hidden md:block glass-card table-container-fix overflow-x-auto border border-slate-100">
                         <table class="w-full text-left border-collapse table-fixed min-w-[1000px]">
@@ -905,6 +936,14 @@
                 </div>
                 <input type="hidden" id="tType">
                 <div id="oldPBox">
+                    <div class="grid grid-cols-2 gap-2 mb-2">
+                        <select id="tFactFilter" onchange="onTProdFilterChange()" class="p-5 rounded-2xl bg-white border border-slate-200 font-black outline-none text-sm text-slate-600">
+                            <option value="">全部工厂</option>
+                        </select>
+                        <select id="tCatFilter" onchange="onTProdFilterChange()" class="p-5 rounded-2xl bg-white border border-slate-200 font-black outline-none text-sm text-slate-600">
+                            <option value="">全部品类</option>
+                        </select>
+                    </div>
                     <div class="relative">
                         <input type="text" id="tProdSearch" placeholder="🔍 输入产品名称搜索..." autocomplete="off" class="w-full bg-slate-100 p-6 rounded-[24px] font-black border-0 outline-none" onfocus="renderTProdDropdown()" oninput="onTProdSearchInput()">
                         <input type="hidden" id="tProd" autocomplete="off">
@@ -1012,6 +1051,7 @@
                 function canSeeCustomer(t) { return canSeeByOwner(t.userId || t.user_id); }
                 function canSeeProductCustomer(p) { return canSeeByOwner(p.createdBy || p.created_by); }
         let products = [], allCategories = [], allFactories = [], allCustomers = [];
+        let tProdResults = [], tProdReqSeq = 0;   // 产品筛选下拉：最近一次查询结果缓存 + 请求序号（丢弃过期响应）
         let qtyChart = null, valueChart = null, sampleChart = null;
         let displayCurrency = 'CNY', exchangeRate = 7.25;
 
@@ -1186,21 +1226,86 @@
                 getEl('statCards').innerHTML = [{t:'本月出库金额',v:formatMoney(performance.totalOut,'CNY'),c:'text-rose-600',i:'truck',bg:'from-rose-500 to-rose-600'},{t:'本月入库金额',v:formatMoney(performance.totalIn,'CNY'),c:'text-emerald-600',i:'download',bg:'from-emerald-500 to-emerald-600'},{t:'总业务流转',v:performance.transCount,c:'text-indigo-600',i:'activity',bg:'from-indigo-500 to-indigo-600'},{t:'当前款式总数',v:performance.activeSkus,c:'text-amber-600',i:'layers',bg:'from-amber-500 to-amber-600'}].map(c => `<div class="glass-card p-6 stat-card flex justify-between items-start" style="animation: fadeInUp 0.5s ease forwards"><div><p class="text-[10px] text-slate-400 font-black uppercase mb-2 tracking-widest">${c.t}</p><p class="text-3xl font-black ${c.c}">${c.v}</p></div><div class="bg-gradient-to-br ${c.bg} p-3 rounded-2xl shadow-lg shadow-${c.c.replace('text-','')}/20"><i data-lucide="${c.i}" class="w-5 h-5 text-white"></i></div></div>`).join('');
                 if (currentUser.role !== 'staff' && leaderboard) getEl('perfList').innerHTML = leaderboard.map((u, i) => `<div class="p-5 bg-white border border-slate-50 rounded-[28px] flex items-center justify-between shadow-sm"><div class="flex items-center space-x-4"><div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-black text-indigo-600 shadow-inner">${i+1}</div><span class="font-black text-slate-700">${esc(u.username)}</span></div><span class="text-indigo-600 font-black">¥ ${u.totalAmount.toLocaleString()}</span></div>`).join('');
                 const labels = productMix.map(p => p.name), qtyD = productMix.map(p => p.balance), valD = productMix.map(p => { const pr = products.find(prod => prod.name === p.name); return (p.balance * (pr?.unitPrice || 0)).toFixed(2); });
-                const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#0ea5e9'];
+                const palette = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#0ea5e9', '#14b8a6', '#f97316', '#3b82f6', '#a855f7', '#e11d48', '#22c55e', '#eab308', '#06b6d4'];
                 const isMobile = window.innerWidth <= 768;
-                const doughnutOpts = (title) => ({
+                // 自定义图例 + 点击扇区弹层，替代 Chart.js 内置底部图例（多产品时换行重叠）
+                const doughnutOpts = (fmt) => ({
                     responsive: true, maintainAspectRatio: isMobile,
                     cutout: isMobile ? '55%' : '60%',
-                    plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: isMobile ? 10 : 20, font: { weight: 'bold', size: isMobile ? 10 : 12 }, boxWidth: isMobile ? 8 : 12 } }, title: { display: false } },
-                    layout: { padding: isMobile ? { bottom: 4 } : { bottom: 10 } }
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: (c) => ` ${c.label}: ${fmt(Number(c.parsed) || 0)}` } }
+                    },
+                    layout: { padding: isMobile ? { bottom: 4 } : { bottom: 10 } },
+                    onClick: (evt, elements, chart) => { if (elements && elements.length) showChartPopup(chart, elements[0].index, evt, fmt); }
                 });
-                if (qtyChart) qtyChart.destroy(); qtyChart = new Chart(getEl('productQtyChart'), { type: 'doughnut', data: { labels, datasets: [{ data: qtyD, backgroundColor: colors, borderWidth: 0, hoverOffset: isMobile ? 6 : 12 }] }, options: doughnutOpts('产品数量占比') });
-                if (valueChart) valueChart.destroy(); valueChart = new Chart(getEl('productValueChart'), { type: 'doughnut', data: { labels, datasets: [{ data: valD, backgroundColor: colors, borderWidth: 0, hoverOffset: isMobile ? 6 : 12 }] }, options: doughnutOpts('资产价值分布') });
+                if (qtyChart) qtyChart.destroy();
+                qtyChart = new Chart(getEl('productQtyChart'), { type: 'doughnut', data: { labels, datasets: [{ data: qtyD, backgroundColor: palette, borderWidth: 0, hoverOffset: isMobile ? 6 : 12 }] }, options: doughnutOpts((v) => v + ' 包') });
+                buildDashLegend(getEl('qtyLegend'), labels, qtyD, palette, (v) => v + ' 包');
+                if (valueChart) valueChart.destroy();
+                valueChart = new Chart(getEl('productValueChart'), { type: 'doughnut', data: { labels, datasets: [{ data: valD, backgroundColor: palette, borderWidth: 0, hoverOffset: isMobile ? 6 : 12 }] }, options: doughnutOpts((v) => formatMoney(v, 'CNY')) });
+                buildDashLegend(getEl('valueLegend'), labels, valD, palette, (v) => formatMoney(v, 'CNY'));
                 const sampleProducts = products.filter(p => p.category && p.category.includes('样品'));
                 if (sampleChart) sampleChart.destroy(); sampleChart = new Chart(getEl('sampleQtyChart'), { type: 'bar', data: { labels: sampleProducts.map(p => p.name), datasets: [{ data: sampleProducts.map(p => p.balance), backgroundColor: '#f59e0b', borderRadius: isMobile ? 8 : 12, barThickness: isMobile ? 18 : 24 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { grid: { display: false }, ticks: { font: { size: isMobile ? 10 : 12 } } }, y: { grid: { display: false }, ticks: { font: { weight: '800', size: isMobile ? 10 : 12 } } } } } });
                 lucide.createIcons();
             } catch (e) { console.error('Dashboard load error:', e); }
         }
+
+        // 环形图点击/触摸扇区：在图表内弹出产品名 + 数值 + 占比（触摸友好）
+        function showChartPopup(chart, index, evt, fmt) {
+            const wrap = chart.canvas.parentElement;
+            if (!wrap) return;
+            let popup = wrap.querySelector('.chart-popup');
+            if (!popup) { popup = document.createElement('div'); popup.className = 'chart-popup'; wrap.appendChild(popup); }
+            const label = chart.data.labels[index];
+            const raw = chart.data.datasets[0].data[index];
+            const val = Number(raw) || 0;
+            const total = (chart.data.datasets[0].data || []).reduce((s, d) => s + (Number(d) || 0), 0) || 1;
+            const pct = (val / total * 100).toFixed(1);
+            const formatter = fmt || ((v) => v);
+            popup.innerHTML = `<div class="cp-name">${esc(label)}</div><div class="cp-val">${formatter(val)}</div><div class="cp-pct">占比 ${pct}%</div>`;
+            const rect = chart.canvas.getBoundingClientRect();
+            // Chart.js onClick 第一参即原生事件；图例点击传的是 {native:{clientX,clientY}} —— 统一归一化
+            const nativeEvt = (evt && evt.native) ? evt.native : evt;
+            const hasXY = nativeEvt && typeof nativeEvt.clientX === 'number';
+            const cx = hasXY ? nativeEvt.clientX : (rect.left + rect.width / 2);
+            const cy = hasXY ? nativeEvt.clientY : (rect.top + rect.height / 2);
+            let left = Math.max(12, Math.min(cx - rect.left, rect.width - 12));
+            let top = cy - rect.top;
+            popup.style.transform = (top < 28) ? 'translate(-50%, 24px)' : 'translate(-50%, -120%)';
+            popup.style.left = left + 'px';
+            popup.style.top = top + 'px';
+            popup.style.opacity = '1';
+            popup.style.display = 'block';
+            clearTimeout(chart._popupTimer);
+            chart._popupTimer = setTimeout(() => { popup.style.opacity = '0'; setTimeout(() => { if (popup) popup.style.display = 'none'; }, 200); }, 2800);
+        }
+
+        // 自定义图例：整齐网格（默认2列、桌面自适应多列），每项可点触发弹层
+        function buildDashLegend(container, labels, values, colors, fmt) {
+            if (!container) return;
+            const nums = (values || []).map(v => Number(v) || 0);
+            const total = nums.reduce((a, b) => a + b, 0) || 1;
+            if (!labels || !labels.length) { container.innerHTML = '<div class="dash-legend-empty">暂无数据</div>'; return; }
+            container.innerHTML = labels.map((lb, i) => {
+                const pct = (nums[i] / total * 100).toFixed(1);
+                const color = colors[i % colors.length];
+                return `<div class="dash-legend-item" data-idx="${i}"><span class="dash-legend-swatch" style="background:${color}"></span><span class="dash-legend-name" title="${esc(lb)}">${esc(lb)}</span><span class="dash-legend-pct">${pct}%</span></div>`;
+            }).join('');
+            container.querySelectorAll('.dash-legend-item').forEach(el => {
+                el.addEventListener('click', () => {
+                    const idx = +el.dataset.idx;
+                    const chart = container.id === 'qtyLegend' ? qtyChart : valueChart;
+                    if (!chart) return;
+                    container.querySelectorAll('.dash-legend-item').forEach(x => x.classList.remove('is-active'));
+                    el.classList.add('is-active');
+                    const r = chart.canvas.getBoundingClientRect();
+                    showChartPopup(chart, idx, { native: { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 } }, fmt);
+                    clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('is-active'), 2800);
+                });
+            });
+        }
+
 
         function formatMoney(v, curr) { let val = parseFloat(v || 0); const orig = curr || 'CNY'; if (orig === 'USD' && displayCurrency === 'CNY') val *= exchangeRate; else if (orig === 'CNY' && displayCurrency === 'USD') val /= exchangeRate; return (displayCurrency === 'CNY' ? '¥' : '$') + val.toLocaleString(undefined, { minimumFractionDigits: 2 }); }
         function toggleDisplayCurrency() { displayCurrency = displayCurrency === 'CNY' ? 'USD' : 'CNY'; document.querySelectorAll('.currency-toggle-btn').forEach(b => b.innerText = `显示币种: ${displayCurrency}`); renderInventory(); renderTrans(); }
@@ -1208,17 +1313,30 @@
         async function renderInventory() {
             try {
                 const res = await api.get('/inventory'); products = res.data; updateProductSelects();
-                const term = getEl('invSearch').value.toLowerCase(); const sortField = getEl('invSortField').value;
+                const term = getEl('invSearch').value.toLowerCase();
+                const sortField = getEl('invSortField').value;
+                const invCatSel = getEl('invCatFilter');
+                const catFilter = invCatSel.value;
+                const groupBy = getEl('invGroupBy').value;
+
+                // 同步品类筛选下拉（基于全量数据，保持稳定，不随搜索/分组变化而重置）
+                const curCat = catFilter;
+                const cats = [...new Set(products.map(p => (p.category || '默认')).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+                invCatSel.innerHTML = `<option value="all">全部品类</option>` + cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+                invCatSel.value = [...invCatSel.options].some(o => o.value === curCat) ? curCat : 'all';
+
                 let filtered = products.filter(p => {
                     const matchesSearch = p.name.toLowerCase().includes(term) || p.sku.toLowerCase().includes(term);
-                    return matchesSearch; // 移除权限过滤，全员可见
+                    const matchesCat = catFilter === 'all' || (p.category || '默认') === catFilter;
+                    return matchesSearch && matchesCat; // 移除权限过滤，全员可见
                 });
                 filtered.sort((a, b) => { let vA = a[sortField], vB = b[sortField]; if (sortField === 'value') { vA = a.balance * a.unitPrice; vB = b.balance * b.unitPrice; } return (typeof vA === 'string') ? vA.localeCompare(vB) : vB - vA; });
                 
                 // 计算汇总金额
                 const totalVal = filtered.reduce((sum, p) => sum + (p.balance * p.unitPrice), 0);
                 getEl('totalInvValue').innerText = formatMoney(totalVal, 'CNY');
-                getEl('invTable').innerHTML = filtered.map(p => {
+                // 单行 HTML（桌面）
+                const rowHtml = (p) => {
                     const fact = allFactories.find(f => f.id === p.factoryId); const isAdmin = currentUser.role !== 'staff';
                     const actBtns = isAdmin ? `<div class="flex space-x-2 mt-2"><button onclick="event.stopPropagation(); openEditModal('${p.id}')" class="p-2 text-indigo-400 hover:bg-indigo-50 rounded-lg transition-colors"><i data-lucide="edit-3" class="w-4 h-4"></i></button><button onclick="event.stopPropagation(); doDeleteProduct('${p.id}')" class="p-2 text-rose-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button></div>` : '';
                     const catTag = `<span class="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md text-xs font-black uppercase border border-indigo-100">${esc(p.category || '默认')}</span>`;
@@ -1251,12 +1369,28 @@
                         </td>
                         <td class="p-8 text-right font-black text-lg xl:text-2xl text-emerald-600 tracking-tighter tabular-nums whitespace-nowrap overflow-hidden text-ellipsis">${formatMoney(p.balance * p.unitPrice, p.currency)}</td>
                     </tr>`;
-                }).join('');
-                getEl('invMobile').innerHTML = filtered.map(p => {
+                };
+
+                const invEmpty = `<tr><td colspan="6" class="p-20 text-center"><div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-200"><i data-lucide="archive" class="w-8 h-8"></i></div><p class="text-slate-400 font-black tracking-widest text-sm uppercase mt-4">未找到匹配的库存记录</p></td></tr>`;
+                if (groupBy === 'category' && filtered.length) {
+                    const groups = {};
+                    filtered.forEach(p => { const k = (p.category || '默认'); (groups[k] = groups[k] || []).push(p); });
+                    const gKeys = Object.keys(groups).sort((a, b) => a.localeCompare(b));
+                    let invHtml = '';
+                    gKeys.forEach(k => {
+                        const items = groups[k];
+                        const gVal = items.reduce((s, p) => s + p.balance * p.unitPrice, 0);
+                        invHtml += `<tr data-group="1" class="bg-indigo-50/70 border-y border-indigo-100"><td colspan="6" class="p-4"><div class="flex items-center justify-between"><div class="flex items-center space-x-2"><i data-lucide="layers" class="w-4 h-4 text-indigo-500"></i><span class="font-black text-indigo-700 text-sm">${esc(k)}</span><span class="text-xs font-bold text-indigo-400">${items.length} 项</span></div><span class="text-sm font-black text-indigo-700 tabular-nums">${formatMoney(gVal, 'CNY')}</span></div></td></tr>`;
+                        invHtml += items.map(rowHtml).join('');
+                    });
+                    getEl('invTable').innerHTML = invHtml;
+                } else {
+                    getEl('invTable').innerHTML = filtered.length ? filtered.map(rowHtml).join('') : invEmpty;
+                }
+                // 移动端卡片
+                const mobileCardHtml = (p) => {
                     const fact = allFactories.find(f => f.id === p.factoryId);
                     const isAdmin = currentUser.role !== 'staff';
-                    
-                    // 移动端管理操作条
                     const mobileActBtns = isAdmin ? `
                     <div class="flex items-center space-x-2 pt-3 border-t border-slate-50 mt-2">
                         <button onclick="event.stopPropagation(); openEditModal('${p.id}')" class="flex-1 flex items-center justify-center space-x-2 py-3 bg-indigo-50 text-indigo-600 rounded-xl font-black text-xs active:scale-95 transition-all">
@@ -1266,7 +1400,6 @@
                             <i data-lucide="trash-2" class="w-3 h-3"></i><span>彻底删除</span>
                         </button>
                     </div>` : '';
-
                     return `
                     <div class="glass-card p-6 space-y-4 shadow-sm active:scale-[0.98] transition-all" onclick="showInvDetail('${p.id}')">
                         <div class="flex justify-between items-start">
@@ -1293,7 +1426,24 @@
                         </div>
                         ${mobileActBtns}
                     </div>`;
-                }).join('');
+                };
+
+                const mEmpty = `<div class="glass-card p-20 text-center space-y-4"><div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-200"><i data-lucide="archive" class="w-8 h-8"></i></div><p class="text-slate-400 font-black tracking-widest text-sm uppercase">未找到匹配的库存记录</p></div>`;
+                if (groupBy === 'category' && filtered.length) {
+                    const groups2 = {};
+                    filtered.forEach(p => { const k = (p.category || '默认'); (groups2[k] = groups2[k] || []).push(p); });
+                    const gk2 = Object.keys(groups2).sort((a, b) => a.localeCompare(b));
+                    let mHtml = '';
+                    gk2.forEach(k => {
+                        const items = groups2[k];
+                        const gVal = items.reduce((s, p) => s + p.balance * p.unitPrice, 0);
+                        mHtml += `<div data-group="1" class="glass-card p-4 bg-indigo-50/70 border border-indigo-100 flex items-center justify-between sticky top-2 z-10"><div class="flex items-center space-x-2"><i data-lucide="layers" class="w-4 h-4 text-indigo-500"></i><span class="font-black text-indigo-700 text-sm">${esc(k)}</span><span class="text-xs font-bold text-indigo-400">${items.length} 项</span></div><span class="text-sm font-black text-indigo-700 tabular-nums">${formatMoney(gVal, 'CNY')}</span></div>`;
+                        mHtml += items.map(mobileCardHtml).join('');
+                    });
+                    getEl('invMobile').innerHTML = mHtml;
+                } else {
+                    getEl('invMobile').innerHTML = filtered.length ? filtered.map(mobileCardHtml).join('') : mEmpty;
+                }
                 lucide.createIcons();
             } catch (e) { console.error('Dashboard load error:', e); }
         }
@@ -1575,7 +1725,7 @@
                 });
                 
                 // 重置 Select 默认值（tType 为隐藏 input，已在上面清空，此处排除）
-                ['qCurr', 'qCat', 'qFact'].forEach(id => {
+                ['tFactFilter', 'tCatFilter', 'qCurr', 'qCat', 'qFact'].forEach(id => {
                     const el = getEl(id); if(el && el.options && el.options[0]) el.selectedIndex = 0;
                 });
             } catch (e) { console.error('Reset Modal Error:', e); }
@@ -1585,6 +1735,7 @@
             console.log('Opening Trans Modal:', type);
             try {
                 resetTransModal();
+                populateTProdFilters();   // 填充工厂/品类筛选下拉
                 const tTypeEl = getEl('tType');
                 if(!tTypeEl) return;
                 tTypeEl.value = type;
@@ -2184,13 +2335,44 @@
         function previewImg(u) { getEl('imgPreviewContent').src = u; getEl('imgPreviewOverlay').classList.remove('hidden'); }
         function updateProductSelects() { const drop = getEl('tProdDropdown'); if(drop && !drop.classList.contains('hidden')) renderTProdDropdown(); }
 
-        // ===== 产品选择：关键词模糊搜索（名称包含、不区分大小写）=====
-        function renderTProdDropdown() {
+        // ===== 产品选择：组合筛选（名称/SKU + 工厂 + 品类，条件可叠加）=====
+        function factNameOf(fid) { const f = allFactories.find(x => String(x.id) === String(fid)); return f ? f.name : ''; }
+        function populateTProdFilters() {
+            const fSel = getEl('tFactFilter'), cSel = getEl('tCatFilter');
+            if (fSel) fSel.innerHTML = ['<option value="">全部工厂</option>'].concat(allFactories.map(f => `<option value="${esc(f.id)}">${esc(f.name)}</option>`)).join('');
+            if (cSel) cSel.innerHTML = ['<option value="">全部品类</option>'].concat(allCategories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`)).join('');
+        }
+        function onTProdFilterChange() { renderTProdDropdown(); }
+        async function renderTProdDropdown() {
             const drop = getEl('tProdDropdown'); if(!drop) return;
             const kw = (getEl('tProdSearch').value || '').trim().toLowerCase();
-            const list = kw ? products.filter(p => (p.name || '').toLowerCase().includes(kw)) : products.slice();
+            const fId = (getEl('tFactFilter')?.value || '');
+            const cat = (getEl('tCatFilter')?.value || '');
+            const seq = ++tProdReqSeq;
+            let list;
+            try {
+                const qs = new URLSearchParams();
+                if (kw) qs.set('search', kw);
+                if (fId) qs.set('factoryId', fId);
+                if (cat) qs.set('category', cat);
+                const res = await api.get('/products?' + qs.toString());
+                list = Array.isArray(res.data) ? res.data : [];
+            } catch (e) {
+                // 后端不可用时回退到本地已加载数据，保证筛选仍可工作且数据准确
+                list = products.filter(p => {
+                    if (kw && !((p.name || '').toLowerCase().includes(kw) || (p.sku || '').toLowerCase().includes(kw))) return false;
+                    if (fId && String(p.factoryId ?? '') !== String(fId)) return false;
+                    if (cat && (p.category || '') !== cat) return false;
+                    return true;
+                });
+            }
+            if (seq !== tProdReqSeq) return; // 丢弃过期响应，避免竞态
+            tProdResults = list;
             drop.innerHTML = list.length
-                ? list.map(p => `<button type="button" data-pid="${p.id}" class="w-full text-left px-5 py-3 hover:bg-indigo-50 border-b border-slate-50 last:border-0 flex items-center justify-between gap-3"><span class="font-black text-sm text-slate-700 break-words">${esc(p.name)}</span><span class="flex items-center gap-2 whitespace-nowrap">${p.spec ? `<span class="text-[10px] text-indigo-600 font-black bg-indigo-50 px-2 py-0.5 rounded-md">尺寸:${esc(p.spec)}</span>` : ''}<span class="text-[10px] text-slate-400 font-bold">${esc(p.sku || '')}</span></span></button>`).join('')
+                ? list.map(p => {
+                    const fn = factNameOf(p.factoryId);
+                    return `<button type="button" data-pid="${p.id}" class="w-full text-left px-5 py-3 hover:bg-indigo-50 border-b border-slate-50 last:border-0 flex items-center justify-between gap-3"><span class="font-black text-sm text-slate-700 break-words">${esc(p.name)}</span><span class="flex items-center gap-2 whitespace-nowrap">${p.spec ? `<span class="text-[10px] text-indigo-600 font-black bg-indigo-50 px-2 py-0.5 rounded-md">尺寸:${esc(p.spec)}</span>` : ''}${fn ? `<span class="text-[10px] text-teal-700 font-black bg-teal-50 px-2 py-0.5 rounded-md">厂:${esc(fn)}</span>` : ''}<span class="text-[10px] text-slate-400 font-bold">${esc(p.sku || '')}</span></span></button>`;
+                }).join('')
                 : '<div class="p-5 text-center text-xs text-slate-400 font-bold">无匹配产品</div>';
             drop.classList.remove('hidden');
             drop.querySelectorAll('button[data-pid]').forEach(b => b.addEventListener('click', () => selectTProd(b.dataset.pid)));
@@ -2201,16 +2383,18 @@
             renderTProdDropdown();
         }
         function selectTProd(pid) {
-            const p = products.find(x => String(x.id) === String(pid)); if(!p) return;
+            const p = (tProdResults.find(x => String(x.id) === String(pid))) || products.find(x => String(x.id) === String(pid)); if(!p) return;
             getEl('tProd').value = p.id;
             getEl('tProdSearch').value = `${p.name} / ${p.sku || ''}`;
             getEl('tProdDropdown').classList.add('hidden');
-            // 展示已选商品的尺寸/品类/材质，便于同名不同尺寸商品精确辨认
+            // 展示已选商品的品类/尺寸/工厂/材质，便于同名不同尺寸、不同工厂的商品精确辨认
             const info = getEl('tProdInfo');
             if (info) {
+                const fn = factNameOf(p.factoryId) || '—';
                 info.innerHTML = `<span class="text-indigo-600">已选商品档案</span>`
                     + `<span class="px-2 py-1 bg-white text-slate-700 rounded-lg border border-indigo-100">品类: ${esc(p.category || '未分类')}</span>`
                     + `<span class="px-2 py-1 bg-white text-indigo-700 rounded-lg border border-indigo-100">尺寸: ${esc(p.spec || '—')}</span>`
+                    + `<span class="px-2 py-1 bg-white text-teal-700 rounded-lg border border-teal-100">工厂: ${esc(fn)}</span>`
                     + `<span class="px-2 py-1 bg-white text-slate-700 rounded-lg border border-indigo-100">材质: ${esc(p.material || '—')}</span>`;
                 info.classList.remove('hidden');
             }

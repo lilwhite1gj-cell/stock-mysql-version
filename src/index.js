@@ -376,6 +376,47 @@ app.get('/api/inventory', authenticate, async (req, res) => {
   }));
 });
 
+app.get('/api/products', authenticate, async (req, res) => {
+  try {
+    const search = (req.query.search || '').trim();
+    const factoryId = (req.query.factoryId || '').trim();
+    const category = (req.query.category || '').trim();
+    let rows;
+    if (useMySQL) {
+      let sql = 'SELECT * FROM products WHERE 1=1';
+      const params = [];
+      if (search) { sql += ' AND (LOWER(name) LIKE ? OR LOWER(sku) LIKE ?)'; const s = `%${search.toLowerCase()}%`; params.push(s, s); }
+      if (factoryId) { sql += ' AND factory_id = ?'; params.push(factoryId); }
+      if (category) { sql += ' AND category = ?'; params.push(category); }
+      rows = await queryRows(sql, params);
+    } else {
+      rows = getLocalData().products.filter(p => {
+        if (search) { const s = search.toLowerCase(); if (!((p.name || '').toLowerCase().includes(s) || (p.sku || '').toLowerCase().includes(s))) return false; }
+        if (factoryId && String(p.factoryId ?? p.factory_id ?? '') !== String(factoryId)) return false;
+        if (category && (p.category || '') !== category) return false;
+        return true;
+      });
+    }
+    // 与 /api/inventory 一致：依据角色/归属隐藏客户信息
+    const uid = String(req.user.id);
+    const isPriv = req.user.role === 'admin' || req.user.role === 'manager';
+    const cleaned = rows.map(p => {
+      const ownerId = String(p.created_by ?? p.createdBy ?? '');
+      const rawCust = p.customer_name ?? p.customerName ?? '';
+      const canSee = isPriv || ownerId === uid;
+      const o = { ...p };
+      delete o.customer_name; delete o.customerName;
+      if (canSee && rawCust) o.customerName = rawCust;
+      o.customerRestricted = !canSee && !!rawCust;
+      return o;
+    });
+    res.json(cleaned);
+  } catch (e) {
+    console.error('GET /api/products error:', e);
+    res.status(500).json({ message: '查询产品失败' });
+  }
+});
+
 app.post('/api/products', authenticate, upload.single('image'), async (req, res) => {
   // 输入验证
   if (!req.body.name || !req.body.name.trim()) return res.status(400).json({ message: '产品名称不能为空' });
